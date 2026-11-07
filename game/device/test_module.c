@@ -89,10 +89,10 @@ static int32_t service(void)
     S.nev++;
     SendMsg(MSG_VALUES);
     uint32_t type = ev >> 24, key = ev & 0x1FF;
-    if (key == 0x002 && (type == 0x20 || type == 0x40)) {      /* Select: back to the menu, as stock */
-        uint16_t seven = 7;
+    if (key == 0x002 && (type == 0x20 || type == 0x40)) {      /* Select: back to the main menu, Games tile */
+        uint16_t tile = 1;                                     /* main menu focus: index 1 = Games/Blockz */
         GameLeaveB();
-        TaskSwitch(0xA, &seven);
+        TaskSwitch(0, &tile);
         COLOR = 0;
         return -1;
     }

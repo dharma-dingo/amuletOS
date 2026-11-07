@@ -35,7 +35,7 @@ the next boot (the screen can stay black for a minute or two) and deletes the fi
 stamp must be newer than the installed one.**
 
 - Stamp format: `YY YY DD MM BB 00 00 00`, BCD, year little-endian, then day, month, build.
-  Today's builds use `26 20 07 11 BB`. Next free build number: **21** (`2620071121000000`).
+  Today's builds use `26 20 07 11 BB`. Next free build number: **22** (`2620071122000000`).
 - **Low battery makes the updater silently eat the file without flashing.** Charge first.
 - Pressing **B on the USB-transfer screen drops USB** (goes back to the main menu).
 
@@ -74,9 +74,10 @@ python art/menu_panels.py build/art_v01
 python art/recolor.py build/img_stock build/art_v01 build/art_v01_auto
 # merge: auto first, then hand-made on top
 mkdir build/art_v01_all; cp build/art_v01_auto/*.png build/art_v01_all/; cp build/art_v01/*.png build/art_v01_all/
-python tools/patch_code.py build/d1 build/d1np2 np_hide_album_genre,np_hide_format,np_title_tag
-python tools/build_module.py build/d1np2 build/d1np2_t1 game/device/test_module.c
-python tools/build_reskin.py build/d1np2_t1 build/art_v01_all 2620071120000000 --out build/v020 --font tall
+python tools/build_helpers.py build/d1 build/d1h game/device/np_helpers.c game/device/np_stub.S
+python tools/patch_code.py build/d1h build/d1h_np np_v2,np_hide_format,menu_games_to_blockz
+python tools/build_module.py build/d1h_np build/d1h_np_t1 game/device/test_module.c --at 0x58800
+python tools/build_reskin.py build/d1h_np_t1 build/art_v01_all 2620071121000000 --out build/v021 --font tall
 ```
 
 ---
@@ -165,7 +166,8 @@ been on an August build).
 | 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | installed; font replaced everywhere but **too small to read** (owner): needs a bigger font |
 | 18 | …18 | build 16 art + tall font (`--font tall`, `art/font_tall.py`) + Now Playing patches (`tools/patch_code.py np_hide_album_genre,np_title_not_filename`) | installed: font size right (owner); Now Playing showed artist + **file name** (0x03048450 is the file name), album/genre hidden; genre icon, white strips past the panel and format line still to fix |
 | 19 | …19 | build 18 + Blockz test module T1 in module 82 (`tools/build_module.py build/d1np build/d1np_t1 game/device/test_module.c`) | superseded by 20 (never on device) |
-| 20 | …20 | build 18 fixes: title tag on the scrolling line with file-name fallback (`np_title_tag`, hooks/np_title.S), format line hidden (`np_hide_format`), Now Playing art: only the artist icon, panels run off the edge so the line strips (069, 028) blend in; + Blockz T1 | copied to device (hash verified); owner to check Now Playing and the Blockz test screen |
+| 20 | …20 | build 18 fixes: title tag on the scrolling line with file-name fallback (`np_title_tag`, hooks/np_title.S), format line hidden (`np_hide_format`), Now Playing art: only the artist icon, panels run off the edge so the line strips (069, 028) blend in; + Blockz T1 | installed: owner wants album back, artist overflows the box; Blockz not reachable (game list untouched) |
+| 21 | …21 | slot-2 resident helpers after D1 (`tools/build_helpers.py`, `game/device/np_helpers.c`): artist wraps onto 2 lines, album on line 3, title with file-name fallback (`np_v2`); format hidden; **Games tile opens Blockz directly** (`menu_games_to_blockz`), panel relabelled BLOCKZ; Blockz T1 moved to code.bin 0x58800, quits to the main menu | built and verified on PC (`build/v021`); not on device |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX

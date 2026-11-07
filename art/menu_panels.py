@@ -18,7 +18,7 @@ from main_menu import panel, STATES
 BASE = THEMES["zeal"]
 ITEMS = [  # title, background pair (owner: titles only, no flavour text)
     ("Music",   ("#acd2f4", "#8fbaec")),
-    ("Games",   ("#eef6f8", "#d4e8ee")),
+    ("Blockz",  ("#eef6f8", "#d4e8ee")),
     ("Library", ("#d8cdf6", "#c2b2ee")),
     ("Folders", ("#f4e2b8", "#e8cf98")),
     ("BT",      ("#c6b2f4", "#ae96ea")),

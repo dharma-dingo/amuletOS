@@ -6,7 +6,7 @@
 Copies SRC_DIR (an unpacked image) to OUT_DIR and patches OUT_DIR/code.bin.
 Each patch entry: (module, run address, original bytes hex or None, new bytes hex).
 """
-import os, shutil, struct, subprocess, sys, tempfile
+import json, os, shutil, struct, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARM = r"C:\Users\Admin\tools\arm-gnu-toolchain\arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\bin"
@@ -31,6 +31,12 @@ PATCHES = {
     "np_hide_format": [
         (27, 0x0308296E, "e2f7d7f9", NOP2),   # image 69 strip at (145, 60)
         (27, 0x03082996, "e1f7eefa", NOP2),   # format text
+    ],
+    # Main menu (module 21) Games tile (index 1, handler 0x03081960): TaskSwitch(0xA, &7) opened the game
+    # list (task 10 page 7). Open task 15 (module 82 = Blockz) directly, no argument.
+    "menu_games_to_blockz": [
+        (21, 0x03081966, "6946", "0021"),     # mov r1, sp -> movs r1, #0
+        (21, 0x03081968, "0a20", "0f20"),     # movs r0, #0xa -> movs r0, #0xf
     ],
 }
 
@@ -76,7 +82,23 @@ def np_title_tag():
         (27, 0x03083554, "50840403", "e0850403"),                              # mode-0 literal 0x03048450 -> title
     ]
 
-GENERATED = {"np_title_tag": np_title_tag}
+SRC_DIR = None   # set by main: generated patches may read SRC_DIR/helpers.json (tools/build_helpers.py)
+
+def np_v2():
+    """Now Playing with the slot-2 helpers (game/device/np_helpers.c): artist wraps onto line 2,
+    album moves to line 3 (genre gone), scrolling line shows the title with file-name fallback."""
+    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    nop = bytes.fromhex("00bf")
+    return [
+        (27, 0x03082A2A, "e1f7a4fa", thumb_bl(0x03082A2A, h["np_artist"]).hex()),          # line 1: artist, 2 lines
+        (27, 0x03082A2E, "0020", thumb_b16(0x03082A2E, 0x03082A7C).hex()),                  # skip line 2 code
+        (27, 0x03082A90, "b1f85a13", "b1f85c12"),                                           # line 3 source: genre -> album
+        (27, 0x0308349A, "2e48e0f759fc", (thumb_bl(0x0308349A, h["np_title_width"]) + nop).hex()),
+        (27, 0x03083466, "02a9a8f800400223384a0846e0f780fd", (thumb_bl(0x03083466, h["np_title_draw"]) + nop * 6).hex()),
+        (27, 0x03083554, "50840403", "e0850403"),                                           # mode-0 literal -> title
+    ]
+
+GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)
@@ -98,7 +120,9 @@ def apply(code: bytearray, names):
             print(f"  {name} {addr:#x}: {old or '(dead code)'} -> {new[:40]}{'...' if len(new) > 40 else ''}")
 
 def main():
+    global SRC_DIR
     src, out, names = sys.argv[1], sys.argv[2], sys.argv[3].split(",")
+    SRC_DIR = src
     os.makedirs(out, exist_ok=True)
     for f in os.listdir(src):
         if os.path.isfile(os.path.join(src, f)) and f != "HIFIYF18.IMG":

@@ -165,6 +165,20 @@ directly by code point (record n = U+n). Neither the v0.1 image reskin nor recol
 glyphs and their advance widths. Still unknown: which screens use which font, and how stock lays
 out text wider than its current advances (clipping or scrolling).
 
+## Tasks (screens) and resident helpers, traced 2026-11-07
+
+- `TaskSwitch(id, arg*)` 0x030680D4 stores the id at 0x030057C0 and copies 0x1C bytes of arg to +0x184. The task
+  loader (0x030680AE) loads module `table[0x030057C0 + 0xC4 + 4*id]` with type 7; descriptor pointers at +4.
+  Ids: 0 MainMenu (m21), 1 MediaLib (m22), 2 MediaBro (m23), 3 Music/Now Playing (m27), 6 Picture (m17),
+  8 Ebook (m30), 9 Browser (m31), 10 Systemset + game list (m32), 11 USB (m9), 12 Charge (m6), 13 (m5),
+  14.. games: 14 Snake (m81), **15 block game (m82)**, 16.. other games (game list launches 0xE..0x2B).
+- Main menu: focus index u16 at 0x03023B94; tile actions via tbb at 0x030818B0: 0 Music, **1 Games
+  (0x03081960: TaskSwitch(10, &7) = game list)**, 2/3 task 9, 4/5 task 10 pages. Returning to the menu:
+  TaskSwitch(0, &index). Build 21 makes tile 1 call TaskSwitch(15, 0).
+- **Slot 2 is resident:** module 1 loads slot 2 (type 7) at boot while reading the system config
+  (0x030827B0), and no module runs above 0x0309F7CC, so code linked into slot 2 at 0x0309F800 stays loaded.
+  `tools/build_helpers.py` appends C helpers after the D1 hook (build 21: 384 B, slot size 0x20C of 0x7F0).
+
 ## Stock Now Playing (module 27), traced 2026-11-07
 
 - Window descriptor: tick 0x030823BE, service 0x03083688, paint 0x030835EC, init 0x030815C4, deinit 0x03081658.

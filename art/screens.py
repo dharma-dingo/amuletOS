@@ -102,7 +102,7 @@ def now_playing(t=T_SKY):
     # info panel runs off the right edge: stock clears each text line with a 128 px strip (image 069)
     # from x=168 to the screen edge, so the panel interior must reach the edge to hide it
     panel(cv, 73, 18, 80, 68, t, False)
-    for k, kind in enumerate(("artist",)):              # owner: artist + title only (album, genre, format hidden)
+    for k, kind in ((0, "artist"), (2, "album")):      # artist wraps over lines 1-2, album on line 3
         ic = small_icon(kind)
         c, m = ic.outlined(t["text"])
         # draw icon at half size: sample every 2nd pixel (12x12 on the grid)
