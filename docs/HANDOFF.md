@@ -35,7 +35,7 @@ the next boot (the screen can stay black for a minute or two) and deletes the fi
 stamp must be newer than the installed one.**
 
 - Stamp format: `YY YY DD MM BB 00 00 00`, BCD, year little-endian, then day, month, build.
-  Today's builds use `26 20 07 11 BB`. Next free build number: **17** (`2620071117000000`).
+  Today's builds use `26 20 07 11 BB`. Next free build number: **18** (`2620071118000000`).
 - **Low battery makes the updater silently eat the file without flashing.** Charge first.
 - Pressing **B on the USB-transfer screen drops USB** (goes back to the main menu).
 
@@ -74,7 +74,7 @@ python art/menu_panels.py build/art_v01
 python art/recolor.py build/img_stock build/art_v01 build/art_v01_auto
 # merge: auto first, then hand-made on top
 mkdir build/art_v01_all; cp build/art_v01_auto/*.png build/art_v01_all/; cp build/art_v01/*.png build/art_v01_all/
-python tools/build_reskin.py build/d1 build/art_v01_all 2620071117000000 --out build/v01
+python tools/build_reskin.py build/d1 build/art_v01_all 2620071117000000 --out build/v017 --font bold1x
 ```
 
 ---
@@ -160,6 +160,7 @@ been on an August build).
 | 14 | …14 | D1 + boot/goodbye art | passed ("v0.1" clipped) |
 | 15 | …15 | D1 + full v0.1 reskin | art-book "beautiful", menu order wrong |
 | 16 | …16 | build 15 + menu mapping fix + no subtitles | copied to device; owner to confirm |
+| 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | built and verified on PC (`build/v017`); not on device |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX

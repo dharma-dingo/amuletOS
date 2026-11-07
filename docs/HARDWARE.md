@@ -161,7 +161,7 @@ directly by code point (record n = U+n). Neither the v0.1 image reskin nor recol
 | `font1.bin` | 2,169,862 B | 33 B | 16 rows x 16 bits | byte 32 = 0x80 + advance (A = 0x88) |
 
 65536 records each, plus 7174 trailing bytes (not yet decoded). U+0000 is a box glyph.
-A data-only font fix is possible: overwrite the ASCII records (U+0020..U+007E) with original
+**Fix chosen (owner, 2026-11-07): style D** = `art/font.py` `bold1x` (original 5x8-grid glyphs, upper and lower case; 16 px font in a bold 1x, 12 px font in regular 1x), applied by `build_reskin.py --font bold1x` from build 17. A data-only font fix is possible: overwrite the ASCII records (U+0020..U+007E) with original
 glyphs and their advance widths. Still unknown: which screens use which font, and how stock lays
 out text wider than its current advances (clipping or scrolling).
 

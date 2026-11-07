@@ -85,7 +85,7 @@ def encode(ch, rows_total, scale, top, caps_only=False, bold=False):
                 if bits & (16 >> c):
                     for sx in range(scale):
                         v |= 0x8000 >> (c * scale + sx)
-            out[y] |= (v | v >> 1) if bold else v
+            out[y] |= (v | ((v >> 1) & ~(v << 1) & 0xFFFF)) if bold else v   # bold: widen strokes, keep 1-px gaps open
     return out, (w + 1) * scale + (1 if bold else 0)
 
 # Styles: (name, font1 scale/top/caps, font0 scale/top/caps)
