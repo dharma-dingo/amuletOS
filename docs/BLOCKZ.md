@@ -120,6 +120,17 @@ Behaviour details chosen while building (change if they feel wrong):
 - Result screen: A or Start = retry, B = quit. Pause: Up/Down + A, Start resumes.
 - Best time is kept across retries in RAM only.
 
+## Device test module T1 (build 19)
+
+`game/device/test_module.c`, linked by `game/device/module.ld`, installed by `tools/build_module.py` into
+module 82's table entry (code at code.bin 0x57C20 in the gap after the D1 hook, data right after it;
+1048 B code, 28 B data, 32 B ZI). Mirrors stock module 82: init posts 0x18C/0x186 and calls
+0x030664A2, 0x03053822; deinit 0x0306645A, 0x03065BC4; Select (event 0x20000002 or 0x40000002) calls
+0x03065BC4, TaskSwitch(0xA, &7) and returns -1; paint saves/restores colour, 0x030643A2(2), 0x030643C6(1).
+Screen: palette swatches, then live TICK, SVC, TIME (0x0302288C), KEY/PREV (last GetKey events), ADC
+(raw ch1), WHEEL (0x030226E4/E5, total), EVENTS. Answers: does the window contract work, the tick and
+service rates, the GetKey event types, whether the ladder can be polled for held keys, wheel counters.
+
 ## Background music (owner, 2026-11-07)
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays
