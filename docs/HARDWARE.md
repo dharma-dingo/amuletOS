@@ -176,6 +176,13 @@ out text wider than its current advances (clipping or scrolling).
   the other the title buffer 0x03048450.
 - Library record (module 34, 0x0308FA50): read from the hidden FAT volume; +0x400 (128 B) title -> 0x03048450,
   +0x500 artist -> 0x03048580+0x15E, +0x600 album -> +0x25C. A second path (0x0308FAF6) fills the title via 0x0305C364.
+- **Title tag:** the tag reader (module 0, dispatcher 0x0306CD04, called by module 33 at play start after
+  clearing the record with 0x03055B8A) writes title to record +0x60, artist +0x15E, album +0x25C (Vorbis
+  "TITLE" match at 0x0306B1A4). 0x03048450 (library record +0x400) is the **file name**, not the title.
+- Format line at (145, 60): string built at 0x030828E0, strip image 69 at 0x0308296E, text 0x03082996.
+- Build 20 (`np_title_tag`): after line 1 the info box jumps to its epilogue, freeing 154 B of dead code at
+  0x03082A30 for two helpers (hooks/np_title.S) that copy the file name into the title field when it is empty;
+  mode 0 uses the title via literal 0x03083554, mode 1 via a call at 0x03083466.
 - Build 18 patches (`tools/patch_code.py`): NOP the album and genre draws and their fallbacks; literal 0x030248FC at
   0x03083550 -> 0x03048450 so the scrolling line always shows the title. Unknown until tested: whether the title
   buffer is filled when playing from Folders.

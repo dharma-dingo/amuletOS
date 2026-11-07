@@ -99,8 +99,10 @@ def now_playing(t=T_SKY):
     status_strip(cv, t)
     diamond_bg(cv, t, 17)
     panel(cv, 4, 18, 68, 68, t, False)                  # art frame: covers stock art at 10..126 / 23..132 px
-    panel(cv, 73, 18, 72, 68, t, False)                 # info panel: artist / album / format text
-    for k, kind in enumerate(("artist", "album", "format")):
+    # info panel runs off the right edge: stock clears each text line with a 128 px strip (image 069)
+    # from x=168 to the screen edge, so the panel interior must reach the edge to hide it
+    panel(cv, 73, 18, 80, 68, t, False)
+    for k, kind in enumerate(("artist",)):              # owner: artist + title only (album, genre, format hidden)
         ic = small_icon(kind)
         c, m = ic.outlined(t["text"])
         # draw icon at half size: sample every 2nd pixel (12x12 on the grid)
@@ -108,7 +110,14 @@ def now_playing(t=T_SKY):
             for xx in range(0, N, 2):
                 if m[yy, xx]:
                     cv.rect(75 + xx // 2, 42 + k * 14 + yy // 2, 1, 1, tuple(int(v) for v in c[yy, xx]))
-    panel(cv, 4, 87, 140, 30, t, False)                 # title / progress / time band
+    # title / progress / time band, full width: the scrolling title line clears a 296 px strip (image 028)
+    panel(cv, -4, 84, 156, 34, t, False)
+    return cv
+
+def np_line_strip(w, t=T_SKY):
+    """Now Playing text-line clear strips (069: 128x16 info lines, 028: 296x16 title line): plain panel fill."""
+    cv = Canvas(w // 2, 8)
+    cv.rect(0, 0, w // 2, 8, t["panel"])
     return cv
 
 def default_art():
@@ -201,6 +210,7 @@ def main():
     save(highlight_bar(296), 184, 1); save(highlight_bar(255), 185, 1)
     save(plain_bg(), 89)
     save(now_playing(), 26)
+    save(np_line_strip(128), 69); save(np_line_strip(296), 28)
     save(default_art(), 277)
     save(usb_screen(), 3)
     for lv, i in enumerate((4, 5, 6, 7)):
