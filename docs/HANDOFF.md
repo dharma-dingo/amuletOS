@@ -159,8 +159,8 @@ been on an August build).
 | 13 | …13 | D1 diagnostics | passed, results above |
 | 14 | …14 | D1 + boot/goodbye art | passed ("v0.1" clipped) |
 | 15 | …15 | D1 + full v0.1 reskin | art-book "beautiful", menu order wrong |
-| 16 | …16 | build 15 + menu mapping fix + no subtitles | copied to device; owner to confirm |
-| 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | built and verified on PC (`build/v017`); not on device |
+| 16 | …16 | build 15 + menu mapping fix + no subtitles | passed (owner: menu panels and text OK) |
+| 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | copied to device (hash verified), owner restarts to install |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX
