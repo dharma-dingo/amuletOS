@@ -8,6 +8,7 @@ Design mockups: https://claude.ai/artifact/REib6hwrurHvLUW9jQSEuJ
 - `firmware/` stock images from the Hidizs download center. Never commit or redistribute these.
 - `tools/ap30fw.py` image tool: `info`, `verify`, `unpack`, `pack [--stamp HEX16]`
 - `tools/rkread.py` read-only loader-mode client (backup); `tools/rkwrite.py` guarded loader-mode writer (recovery)
+- `tools/build_hook.py` assembles a `hooks/*.S` hook into the code.bin 0x57B8C gap (proven NOT loaded at run time, needs a new location), redirects its BL, packs and verifies (`build_hook.py h0 2620071111000000` → `build/h0/HIFIYF18.IMG`)
 - `tools/fwmap.py` function/string index; `tools/xref.py` caller trees; `tools/fwdis.py` annotated disassembly
 - `docs/HARDWARE.md` M1 hardware notes
 - `build/` scratch output (git-ignored)
@@ -46,8 +47,9 @@ M1:
 - [ ] Audio path (DAC, amp, mute timing, play latency). In progress: DAC power-up runs on every music start; fixed waits ≈ 270 ms of the ~3 s. See docs/HARDWARE.md
 - [x] Buttons + volume wheel: 8 face buttons on one ADC ladder (ch1) + 1 GPIO key; wheel = quadrature encoder on GPIO2 pins 0/9. Simultaneous face-button presses likely impossible in hardware (to measure). See docs/HARDWARE.md
 - [x] Display (static part): 296×240 RGB565 RAM framebuffer, DMA to LCD FIFO 0x6009000C, panel driver chosen from a flash table at boot. Open: controller model, bus speed (measure on device)
-- [x] Memory: ≈ 622 KB core A SRAM in use, ≈ 180 KB core B; boot ROM loads the whole code image into RAM; free 16 KB block at RAM 0x030A7B8C (code.bin 0x57B8C)
+- [x] Memory: ≈ 622 KB core A SRAM in use, ≈ 180 KB core B; the "whole image in RAM" model and the 16 KB free block were disproved on device by H0/H0a
 - [x] Arm GNU Toolchain 13.3.Rel1 installed and verified (see docs/HARDWARE.md)
+- [ ] Run custom code from a loaded location (H0/H0a in the code.bin gap failed: gap not loaded)
 - [ ] On-device measurements (diagnostic build): CPU clock, full-frame blit time, raw ADC for button pairs, play-path timing
 - [ ] Power / battery / charging (read-only)
 - [ ] docs/HARDWARE.md
@@ -58,7 +60,7 @@ M1:
 - Module 0 = resident core: 0x2E300 bytes from code.bin 0x2988C, runs at 0x03050000; data runs at 0x03004000.
 - Module 12 = USB mass storage: code runs at 0x03083610 (code.bin 0x813E8), INQUIRY blocks at 0x03036790 (internal) / 0x030367B4 (SD).
 
-Device currently runs the Gate 1b build (V1.7.8 + SCHALAOS vendor + LUN0 inquiry swap). Harmless; reflash stock `firmware/HIFIYF18.IMG` with a newer stamp to undo.
+Device currently runs stock V1.7.8 code with stamp build 11 (after H0/H0a; see docs/HARDWARE.md "Device experiments log"). Next update must stamp build 12 or later.
 
 ## Decisions
 

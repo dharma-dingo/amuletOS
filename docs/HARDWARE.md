@@ -105,16 +105,16 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 
 - Core A SRAM in use: 0x03004000–0x0309F7CC (≈ 622 KB; chip likely 640 KB). Module 0: 185 KB code at 0x03050000, 6.6 KB data at 0x03004000, 120 KB ZI at 0x03005A8C (holds the framebuffer). Overlay code window 0x03080E9C–0x0309F7CC (≈ 120 KB).
 - Core B region in use: 0x01000000–0x0102D184 (≈ 180 KB), decoders in modules 71–80.
-- **Load model** (per ReChord `firmware_ap.ld`, consistent with everything seen here): the boot ROM loads the whole code section contiguously into RAM, with code.bin offset 0 at 0x03050000. Module-table "load" addresses are therefore real RAM addresses, and overlays are copied from that in-RAM image on demand. RAM extends at least to the end of the loaded image (≈ 0x031D8714), well beyond the ≈ 622 KB the modules execute in.
+- **Load model: DISPROVED on device (H0/H0a, 2026-11-07).** The ReChord-based assumption was: the boot ROM loads the whole code section contiguously into RAM, with code.bin offset 0 at 0x03050000. Module-table "load" addresses are therefore real RAM addresses, and overlays are copied from that in-RAM image on demand. RAM extends at least to the end of the loaded image (≈ 0x031D8714), well beyond the ≈ 622 KB the modules execute in.
 - Runtime reuse of the loaded image: after boot, module 0 runs at 0x03050000, a heap/buffer area follows at 0x0307E300 (fixed-address globals, e.g. 0x0307E710 has 35 references), and overlays execute at 0x03080E9C–0x0309F7CC. Sources above that (module data and overlay sources from 0x030ABB8C up) must stay intact.
-- **Free block:** code.bin 0x57B8C–0x5BB8C (16 KB of zeros between module 0's code source and its data source) sits in RAM at **0x030A7B8C–0x030ABB8C** after boot. No module executes there and no constant in the image points into it.
+- **Free block: NOT usable.** code.bin 0x57B8C–0x5BB8C (16 KB of zeros) was assumed to sit in RAM at 0x030A7B8C. H0 (INQUIRY swap) and H0a (pure tail-call pass-through) both placed there and called from module 12's `bl usb_send` (0x03083978) hang USB enumeration: the device appears as 071B:3203 with no LUNs, then drops. A pass-through failing means our bytes are not at 0x030A7B8C at run time. Working model: modules are copied to their exec addresses individually and the gap is never loaded. Hooks must live inside a module that is loaded (e.g. module 12 itself or module 0 padding), or in a new module-table entry once the loader is traced.
 - Mailbox send (core A → B): 0x0306DCD4(value, channel, slot), registers at 0x40110000 + ch×0x50 + {8,0x10,0x18,0x20}.
 
 ## Game Boy feasibility (M5) after M1 so far
 
 | Question | Status |
 |---|---|
-| RAM | **OK.** Well over 1 MB of RAM in total; GB Color needs ~48 KB console RAM + bank cache |
+| RAM | **Unknown again.** The >1 MB figure relied on the disproved load model; ≈ 622 KB core A in use; GB Color needs ~48 KB console RAM + bank cache |
 | CPU clock | Unknown. DelayMs reads it from a clock variable; measure on device |
 | Display push speed | Unknown. Measure a full-frame DMA blit on device |
 | Simultaneous buttons | **Risk.** All 8 face buttons share one ADC ladder; most pairs likely unreadable. Measure raw pair values |
@@ -132,3 +132,10 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 - LCD interface and bus speed (Echo Mini shares the bus with flash)
 - Key wiring: are simultaneous presses limited by hardware
 - Amp (RT6863) enable/mute GPIO and timing
+
+## Device experiments log
+
+- **H0 / H0a (2026-11-07), build 11.** Hook in the code.bin 0x57B8C gap, BL at 0x03083978 redirected. Both hang USB mass storage (see Memory). First H0 copy-update was silently consumed without flashing (battery was flat; device would not power on until charged). Second attempt flashed both slots.
+- **Sector patching in loader mode works.** The flash copy of a slot is the IMG without its CRC trailer (slot offset 0x1C00000 holds unrelated data), so a change confined to one sector can be written directly with `rkwrite.py wl <slot LBA + sector> <512-byte file> --allow-any` (fw1 LBA 0, fw2 LBA 0xF000). Used to switch H0 → H0a and then restore the stock BL sector (0x40C) in both slots.
+- **After a stalled read, the BootROM can drop off USB or fail the descriptor request.** Power off fully (hold 10 s) and replug; send `td` before the first read.
+- Device now: stock V1.7.8 code with stamp `26 20 07 11 11`; 8 inert H0a bytes in the never-loaded gap. USB names `HIFI MP3 USB MP3` / `HIFI MP3 SD`.
