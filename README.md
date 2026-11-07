@@ -96,6 +96,7 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
 
 ## Backlog (next version)
 
+- **Play-start delay (owner, 2026-11-07):** the slow start (~3 s) happens when a song is started from **Folders** (file browser), not from **Music** (library). Points at the folder-mode path (directory scan / file count in the current folder, `0x0305ADA8`, re-navigation from the folder stack) rather than the DAC or decoder start. For v0.3.
 - **Library update (owner, 2026-11-07):** stock forces a full "updating library" (~1 minute) even when nothing changed on the SD card. Find an elegant fix: skip the scan unless the user asks for it (an Update Library item in Settings), or only scan when a cheap check (card serial + root/folder timestamps or file count) shows a change. First step: find what triggers the scan at boot/card insert in stock (could be a small patch for v0.1/v0.2, before our own library code).
 - **Song lists (owner, 2026-11-07, future):** at song level, stock's music navigation shows file names. Show the title tag instead (file name only when there is no tag), sorted by disc number, then track number, then file name.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
