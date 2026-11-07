@@ -285,8 +285,9 @@ been on an August build).
 ### 6.4 After that
 - v0.2 Now Playing (owner, 2026-11-07): v0.1 left stock's run-time text (font and positions) on
   Now Playing, so it doesn't match the mockup. Replace module 27 with our own window drawn like the
-  mockup ("AP30 Screen Mockups", Now Playing): status bar, art panel, title/artist/disc/format in
-  the compact 6 px font, double-size scrolling track title, progress bar with lavender playhead,
+  mockup ("AP30 Screen Mockups", Now Playing): status bar, art panel, artist and album in
+  the compact 6 px font (owner: show only artist, album, song title, art and play time; no genre,
+  file name, disc or format), double-size scrolling track title, progress bar with lavender playhead,
   elapsed/remaining. Needs stock's playback state (tags, position, length, cover) and its transport
   calls; trace them from module 27. Reuses Blockz's module build tooling and renderer
   approach (own RGB565 drawing, dirty rects). Fallback: patch ASCII glyphs in stock's font section.
