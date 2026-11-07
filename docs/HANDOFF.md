@@ -290,6 +290,9 @@ been on an August build).
   elapsed/remaining. Needs stock's playback state (tags, position, length, cover) and its transport
   calls; trace them from module 27. Reuses the block game's module build tooling and renderer
   approach (own RGB565 drawing, dirty rects). Fallback: patch ASCII glyphs in stock's font section.
+- v0.2 carousel (owner, 2026-11-07): one level, items Now Playing, Music, Block Game, Library;
+  Start opens Settings; Bluetooth and Folders go under Settings later. Stock's Music and Library
+  screens are opened directly until ours replace them (trace their launch calls in module 21).
 - v0.2 own UI: an ES-DE-style carousel (true one-direction movement, Start opens Settings),
   compact 6 px font, scrolling titles, metadata browsing. Same window contract, replacing the main
   menu (module 21) and then the browser modules.
