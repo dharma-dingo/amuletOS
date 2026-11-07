@@ -205,6 +205,14 @@ out text wider than its current advances (clipping or scrolling).
   when the card is in, 0x03058526(disk) switches (MusicInit does this when the chosen disk has no files).
 - Owner's card (2026-11-07): exFAT, 128 GB; /_blockgame/ holds "Classic Theme.mp3" (any audio file there should
   work: play the first in stock's file order).
+- Folder browser internals (m31): listing (0x03081740) uses an iterator {dir cluster, index, count, ..., exFAT dir info
+  0x2A B at +0x1C} with FindFirst/FindNext into a 32-byte entry (attr at +0x0B, 0x10 = directory); long names via
+  0x0305C364 (FAT) or 0x0305B2D0(&exinfo, index-1, type, out) (exFAT). Folder counts: FAT files 0x0305BDF6,
+  dirs 0x0305A6B4; exFAT files 0x0305BF7E(&exinfo, ...), dirs 0x0305A79E. Root cluster per disk: 0x0305B11A(disk).
+  Browser state 0x03021EE8 (folder entries of 56 B: +0x14/+0x18 cluster, +0x24 flag), source byte 0x03024CA4.
+- Music engine in folder mode counts files in the FS *current directory*: 0x0305ADA8(filter, 1); mode 3 is used for
+  source 0x63. Resume/next re-navigates from the folder stack the play request carries (record +0xF4 depth,
+  +0x100/+0x110 stacks), so v0.21 must fill that stack correctly.
 - Still needed for v0.21: find /_blockgame/ on the SD card (disk select, root cluster, directory entry lookup),
   the browser's file indexing (which entries count, order), and the exact source-type value; then fill the record
   and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
