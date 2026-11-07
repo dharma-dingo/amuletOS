@@ -16,13 +16,13 @@ from icons import SETS, N
 from main_menu import panel, STATES
 
 BASE = THEMES["zeal"]
-ITEMS = [  # title, flavour, background pair
-    ("Music",   "Songs of the sky",  ("#acd2f4", "#8fbaec")),
-    ("Games",   "Blocks of Zeal",    ("#eef6f8", "#d4e8ee")),
-    ("Library", "The royal archive", ("#d8cdf6", "#c2b2ee")),
-    ("Folders", "Treasure vaults",   ("#f4e2b8", "#e8cf98")),
-    ("BT",      "Crystal link",      ("#c6b2f4", "#ae96ea")),
-    ("Setup",   "Palace workshop",   ("#c2e8de", "#a4d8cc")),
+ITEMS = [  # title, background pair (owner: titles only, no flavour text)
+    ("Music",   ("#acd2f4", "#8fbaec")),
+    ("Games",   ("#eef6f8", "#d4e8ee")),
+    ("Library", ("#d8cdf6", "#c2b2ee")),
+    ("Folders", ("#f4e2b8", "#e8cf98")),
+    ("BT",      ("#c6b2f4", "#ae96ea")),
+    ("Setup",   ("#c2e8de", "#a4d8cc")),
 ]
 
 def diamond(cv, a, b, y0):
@@ -43,7 +43,7 @@ def icon_at(cv, sprite, x, y, ink, scale=1, fade=None):
                 cv.rect(x + xx * scale, y + yy * scale, scale, scale, col)
 
 def screen(sel, t=BASE):
-    title, flavour, (b1, b2) = ITEMS[sel]
+    title, (b1, b2) = ITEMS[sel]
     icons = [f() for f in SETS["relic"]]
     cv = Canvas()
     cv.rect(0, 0, W, 16, t["panel"]); cv.rect(0, 16, W, 1, t["border"])
@@ -59,10 +59,9 @@ def screen(sel, t=BASE):
     px, py, pw, ph = 44, 19, 60, 56
     panel(cv, px, py, pw, ph, t, True)
     icon_at(cv, icons[sel], px + (pw - 2 * N) // 2, py + 4, t["text"], 2)
-    # title and flavour on a ribbon
-    cv.rect(10, 77, W - 20, 28, t["border"]); cv.rect(11, 78, W - 22, 26, t["panel"])
-    cv.text(title, (W - tw(title, 2) + 1) // 2, 80, t["text"], 2)
-    cv.text(flavour, (W - tw(flavour) + 1) // 2, 96, t["dim"])
+    # title on a ribbon
+    cv.rect(24, 79, W - 48, 22, t["border"]); cv.rect(25, 80, W - 50, 20, t["panel"])
+    cv.text(title, (W - tw(title, 2) + 1) // 2, 83, t["text"], 2)
     # 2x3 position map
     mx, my = (W - (3 * 6 - 2)) // 2, 107
     for k in range(6):
