@@ -35,7 +35,7 @@ the next boot (the screen can stay black for a minute or two) and deletes the fi
 stamp must be newer than the installed one.**
 
 - Stamp format: `YY YY DD MM BB 00 00 00`, BCD, year little-endian, then day, month, build.
-  Today's builds use `26 20 07 11 BB`. Next free build number: **23** (`2620071123000000`).
+  Today's builds use `26 20 07 11 BB`. Next free build number: **24** (`2620071124000000`).
 - **Low battery makes the updater silently eat the file without flashing.** Charge first.
 - Pressing **B on the USB-transfer screen drops USB** (goes back to the main menu).
 
@@ -77,7 +77,7 @@ mkdir build/art_v01_all; cp build/art_v01_auto/*.png build/art_v01_all/; cp buil
 python tools/build_helpers.py build/d1 build/d1h game/device/np_helpers.c game/device/np_stub.S
 python tools/patch_code.py build/d1h build/d1h_np np_v3,np_hide_format,menu_games_to_blockz
 python tools/build_module.py build/d1h_np build/d1h_np_bz game/device/blockz.c --at 0x58800
-python tools/build_reskin.py build/d1h_np_bz build/art_v01_all 2620071122000000 --out build/v022 --font tall
+python tools/build_reskin.py build/d1h_np_bz build/art_v01_all 2620071123000000 --out build/v023 --font tall
 ```
 
 ---
@@ -168,7 +168,8 @@ been on an August build).
 | 19 | …19 | build 18 + Blockz test module T1 in module 82 (`tools/build_module.py build/d1np build/d1np_t1 game/device/test_module.c`) | superseded by 20 (never on device) |
 | 20 | …20 | build 18 fixes: title tag on the scrolling line with file-name fallback (`np_title_tag`, hooks/np_title.S), format line hidden (`np_hide_format`), Now Playing art: only the artist icon, panels run off the edge so the line strips (069, 028) blend in; + Blockz T1 | installed: owner wants album back, artist overflows the box; Blockz not reachable (game list untouched) |
 | 21 | …21 | slot-2 resident helpers after D1 (`tools/build_helpers.py`, `game/device/np_helpers.c`): artist wraps onto 2 lines, album on line 3, title with file-name fallback (`np_v2`); format hidden; **Games tile opens Blockz directly** (`menu_games_to_blockz`), panel relabelled BLOCKZ; Blockz T1 moved to code.bin 0x58800, quits to the main menu | passed: BLOCKZ tile and test screen work (owner); title right (could be bolder); artist wrap good; wants artist higher and album wrapped too |
-| 22 | …22 | Now Playing: artist at y 49 and album at y 91, both wrapping over two lines (`np_v3`, helpers 500 B); **Blockz T2: the real game** (`game/device/blockz.c`: core + renderer via FillRect, SysTick 60 fps pacing, ADC directions, GetKey presses, wheel = hold) | copied to device (hash verified); owner to test Blockz play and Now Playing |
+| 22 | …22 | Now Playing: artist at y 49 and album at y 91, both wrapping over two lines (`np_v3`, helpers 500 B); **Blockz T2: the real game** (`game/device/blockz.c`: core + renderer via FillRect, SysTick 60 fps pacing, ADC directions, GetKey presses, wheel = hold) | Blockz runs and "everything else looks perfect" (owner); bug: random backtracks / sudden drops / shifted hard drops on about every other piece = raw ladder ADC caught mid-sweep |
+| 23 | …23 | Blockz: ladder reading accepted only after 16 ms stable (debounce); read-only INFO page (pause, then Left) showing stock's play state for v0.21 | built and verified on PC (`build/v023`); not on device |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX

@@ -5,7 +5,9 @@
  * Timing: stock runs SysTick at 10 ms and counts ticks at 0x0302288C; SysTick VAL gives the
  * position inside the tick, so time = ticks * 10 ms + (LOAD - VAL) / (LOAD + 1) * 10 ms,
  * independent of the CPU clock. The core steps at a fixed 60 fps from that clock.
- * Input: Left/Right/Down held state from the button ADC (ch1, measured midpoints); A, B, Up,
+ * Input: Left/Right/Down held state from the button ADC (ch1, measured midpoints), debounced: a reading
+ * counts only after it has been stable for 16 ms, because pressing or releasing one button sweeps the
+ * ladder voltage through the others (Right -> idle passes Up, Left, Down); A, B, Up,
  * Start as press events from GetKey (type 0x40); Select quits; wheel steps = hold (T2: any
  * direction; the wheel still changes volume). docs/BLOCKZ.md, docs/HARDWARE.md. */
 #include <stdint.h>
@@ -26,6 +28,7 @@
 
 #define EV_PRESS   0x40u
 #define K_SELECT   0x002
+#define K_LEFT     0x008
 #define K_UP       0x010
 #define K_B        0x040
 #define K_A        0x080
@@ -38,8 +41,13 @@ static struct {
     uint8_t pulses;              /* press events waiting for the next frame */
     uint8_t wa, wb;              /* wheel counters last seen */
     uint8_t dirty, quit;
+    uint8_t adc_state, adc_cand; /* debounced ladder state and the candidate being timed */
+    uint32_t adc_since;
+    uint8_t info, info_drawn;    /* read-only INFO page (pause, then Left) */
     uint32_t seed;
 } S;
+
+#define ADC_STABLE_US 16000
 
 /* libc pieces the compiler may emit for struct copies */
 void *memcpy(void *d, const void *s, unsigned n) { uint8_t *a = d; const uint8_t *b = s; while (n--) *a++ = *b++; return d; }
@@ -60,14 +68,28 @@ static uint32_t now_us(void)
     return t1 * 10000u + (per_us ? (load - v) / per_us : 0);
 }
 
-static uint8_t held_from_adc(void)
+static uint8_t decode_adc(uint16_t a)
 {
-    uint16_t a = ADC_CH1;           /* measured: Right 0, Up ~119, Left ~241, Down 364, idle 1023 */
+    /* measured: Right 0, Up ~119, Left ~241, Down 364, idle 1023. Up is a distinct state (0x80 marker)
+     * so a sweep through it counts as a change; it maps to no held input (hard drop comes from GetKey). */
     if (a < 60)  return IN_RIGHT;
-    if (a < 180) return 0;          /* Up: taken from GetKey as a press (hard drop) */
+    if (a < 180) return 0x80;
     if (a < 302) return IN_LEFT;
     if (a < 426) return IN_DOWN;
+    if (a < 950) return 0x40;       /* Select / Start / B / A: no held input */
     return 0;
+}
+
+static void poll_adc(uint32_t now)
+{
+    uint8_t k = decode_adc(ADC_CH1);
+    if (k != S.adc_cand) { S.adc_cand = k; S.adc_since = now; }
+    else if (k != S.adc_state && now - S.adc_since >= ADC_STABLE_US) S.adc_state = k;
+}
+
+static uint8_t held_from_adc(void)
+{
+    return S.adc_state & (IN_LEFT | IN_RIGHT | IN_DOWN);
 }
 
 static void quit(void)
@@ -118,6 +140,13 @@ static int32_t service(void)
         uint32_t ev = GetKey();
         if (!ev) break;
         if ((ev >> 24) != EV_PRESS && !((ev & 0x1FF) == K_SELECT && (ev >> 24) == 0x20)) continue;
+        if (S.info) {                                /* INFO page: any of these closes it */
+            uint32_t k = ev & 0x1FF;
+            if (k == K_LEFT || k == K_B || k == K_START || k == K_A) { S.info = 0; CACHE.valid = 0; S.dirty = 1; }
+            if (k == K_SELECT) { quit(); return -1; }
+            continue;
+        }
+        if ((ev & 0x1FF) == K_LEFT && G.state == ST_PAUSE) { S.info = 1; S.info_drawn = 0; S.dirty = 1; continue; }
         switch (ev & 0x1FF) {
         case K_SELECT: quit(); return -1;
         case K_A:      S.pulses |= IN_CW; break;
@@ -132,6 +161,8 @@ static int32_t service(void)
 
     /* fixed 60 fps steps from the SysTick clock */
     uint32_t t = now_us(), dt = t - S.last_us;
+    poll_adc(t);
+    if (S.info) { S.last_us = t; S.acc3 = 0; S.pulses = 0; if (S.dirty) SendMsg(MSG_DRAW); return 0; }
     if ((int32_t)dt < 0) dt = 0;
     S.last_us = t;
     if (dt > 100000) dt = 100000;                  /* after a stall: at most 6 frames of catch-up */
@@ -148,10 +179,69 @@ static int32_t service(void)
     return 0;
 }
 
+/* ---- INFO page: stock play state, for wiring v0.21 (read-only) ---- */
+static int ihex(char *p, uint32_t v, int digits)
+{
+    for (int i = digits - 1; i >= 0; i--, v >>= 4) p[i] = "0123456789ABCDEF"[v & 15];
+    return digits;
+}
+static uint32_t rd8(uint32_t a)  { return *(volatile uint8_t *)a; }
+static uint32_t rd16(uint32_t a) { return rd8(a) | rd8(a + 1) << 8; }
+static uint32_t rd32(uint32_t a) { return rd16(a) | rd16(a + 2) << 16; }
+
+static void info_line(int row, const char *label, const uint32_t *v, const uint8_t *digits, int n)
+{
+    char b[32]; int k = 0;
+    while (*label) b[k++] = *label++;
+    for (int i = 0; i < n; i++) { b[k++] = ' '; k += ihex(b + k, v[i], digits[i]); }
+    b[k] = 0;
+    text(14, 10 + row * 16, b, C_TEXT);
+}
+
+#define SYSC 0x03022894u   /* system config */
+#define PREC 0x03022F14u   /* music source record */
+
+static void info_page(void)
+{
+    fill(0, 0, BG_SCR_W, BG_SCR_H, C_PANEL);
+    uint32_t running = STOCK_FN(0x03057C7C, uint32_t, uint32_t, uint32_t)(rd32(0x030232BC), 0x030361A4);
+    static const uint8_t d4[3] = {4, 4, 4}, d8[2] = {8, 8}, dfs[3] = {2, 8, 2}, ddk[3] = {2, 2, 1};
+    uint32_t v[3];
+    text(14, 10, "INFO", C_DIM);
+    v[0] = rd16(SYSC + 0x89);  v[1] = rd16(PREC + 0xF2); info_line(1, "SRC", v, d4, 2);
+    v[0] = rd16(SYSC + 0x18B); v[1] = rd16(PREC + 0xF4); info_line(2, "DEP", v, d4, 2);
+    v[0] = rd16(SYSC + 0x5E);  v[1] = rd16(PREC + 6);    info_line(3, "IDX", v, d4, 2);
+    v[0] = rd32(PREC + 0x34);  v[1] = rd32(PREC + 0x38); info_line(4, "CL", v, d8, 2);
+    v[0] = rd8(0x0307E710); v[1] = rd32(0x0307F250); v[2] = rd8(0x0307EFC8); info_line(5, "FS", v, dfs, 3);
+    for (int i = 0; i < 3; i++) v[i] = rd16(SYSC + 0x81 + 2 * i);  info_line(6, "ST", v, d4, 3);
+    for (int i = 0; i < 3; i++) v[i] = rd16(SYSC + 0x18D + 2 * i); info_line(7, "SX", v, d4, 3);
+    v[0] = rd32(SYSC + 0x79);  v[1] = rd32(SYSC + 0x7D); info_line(8, "XX", v, d8, 2);
+    v[0] = rd16(SYSC + 0x195); v[1] = rd16(SYSC + 0x197); info_line(9, "AA", v, d4, 2);
+    v[0] = rd8(SYSC + 0x0E); v[1] = rd8(SYSC + 0x1F); v[2] = running; info_line(10, "DK", v, ddk, 3);
+    char b[24]; int k = 0;                      /* first letters of the current path */
+    b[k++] = 'P'; b[k++] = ' ';
+    for (int i = 0; i < 18; i++) {
+        uint32_t c = rd16(0x03022BBA + 2 * i);
+        if (!c) break;
+        if (c >= 'a' && c <= 'z') c -= 32;
+        b[k++] = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ? (char)c : '-';
+    }
+    b[k] = 0;
+    text(14, 10 + 11 * 16, b, C_TEXT);
+    text(14, 10 + 13 * 16, "B BACK", C_DIM);
+}
+
 static void paint(void)
 {
     uint16_t old_color = COLOR;
     if (GetMsg(MSG_CLEAR)) CACHE.valid = 0;
+    if (S.info) {
+        GetMsg(MSG_DRAW);
+        if (!S.info_drawn) { RC = &CACHE; info_page(); S.info_drawn = 1; }
+        S.dirty = 0;
+        COLOR = old_color;
+        return;
+    }
     if (GetMsg(MSG_DRAW) || !CACHE.valid) {
         bg_render(&G, 0, 0, &CACHE);
         S.dirty = 0;
