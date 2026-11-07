@@ -70,3 +70,7 @@ Device currently runs D1 (stock V1.7.8 + slot-2 diagnostic INQUIRY hook), stamp 
 - Scope: browse by metadata (Artist > Album > Track), M3U, fast play start, snappy nav, block game with background MP3; Game Boy emulation is M5
 - Look: Zeal Sky default palette with lavender accents, compact 6px font, big scrolling titles, no transitions, diamond pattern, arrow cursor, boot splash with floating islands
 - P0: sound within 300 ms of pressing play; every press redrawn within one frame; playable within 3 s of power-on
+
+## Backlog (next version)
+
+- **Block game controls (face buttons can't combine, measured by D1).** Stock has the same limit. Options discussed 2026-11-07: (1) rotate on the volume wheel; (2) hybrid, wheel rotates plus A/B rotate when no direction is held (preferred); (3) face buttons only with DAS kept through brief direction release (avoid); (4) the GPIO2 pin 5 key as an extra rotate. Also: adjustable DAS/ARR, wheel = piece control in game with volume in the pause menu, ADC thresholds at midpoints of measured values. Open: wheel position/ergonomics, and which physical button the GPIO key is.
