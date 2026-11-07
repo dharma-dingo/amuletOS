@@ -54,10 +54,10 @@ Values marked **(owner?)** are proposals waiting for Brett's pick.
   O does not kick. No 180° rotation in the first cut.
 - Randomiser: 7-bag.
 - Hold: one slot, once per piece until it locks; held piece returns in spawn state at the top.
-- Next previews: 5 (Apotris allows 1–5) **(owner?)**.
+- Next previews: **1** (owner).
 - Ghost piece: on.
 - Lock delay: 30 frames (0.5 s), move reset limited to 15 moves/rotations, reset on falling a row.
-- Line clear delay / entry delay (ARE): 0 for Sprint feel **(owner?)**.
+- Line clear delay and entry delay: **none** (owner: Sprint is fluid and fast).
 - Top-out: spawn overlaps blocks, or a piece locks fully above the visible field.
 
 ## Handling (frames at 60 fps; Apotris-style presets)
@@ -86,7 +86,7 @@ Directional delay (DAS resets on direction change): on. Initial hold/rotate (IHS
 
 - 296×240 screen, rounded corners: nothing important within ~12 px of a corner.
 - Well 10×20 cells of 11 px (110×220) centred; left panel: HOLD box, timer, lines left; right
-  panel: 5 previews (first larger). Framed panels and diamond background like the menus.
+  panel: NEXT (1 preview). Framed panels and diamond background like the menus.
 - Bevelled blocks (light top-left edge, dark bottom-right), guideline piece colours tuned to the
   palette (I cyan, O yellow, T purple, S green, Z red, J blue, L orange). Ghost = outlined cells.
 - Plain text labels only (HOLD, NEXT, TIME, LINES, PPS). No themed copy.
