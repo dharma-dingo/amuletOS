@@ -9,6 +9,7 @@ Design mockups: https://claude.ai/artifact/REib6hwrurHvLUW9jQSEuJ
 - `tools/ap30fw.py` image tool: `info`, `verify`, `unpack`, `pack [--stamp HEX16]`
 - `tools/rkread.py` read-only loader-mode client (backup); `tools/rkwrite.py` guarded loader-mode writer (recovery)
 - `tools/build_hook.py` assembles a `hooks/*.S` hook into the code.bin 0x57B8C gap (proven NOT loaded at run time, needs a new location), redirects its BL, packs and verifies (`build_hook.py h0 2620071111000000` → `build/h0/HIFIYF18.IMG`)
+- `tools/imgres.py` UI image section (ROCK26IMAGERES): `list`, `export` to PNG + index.json, `pack` back (byte-identical round trip). Pixels are raw big-endian RGB565
 - `tools/inquiry.py` sends a live SCSI INQUIRY to a drive letter (reads D1 diagnostics, no admin)
 - `tools/fwmap.py` function/string index; `tools/xref.py` caller trees; `tools/fwdis.py` annotated disassembly
 - `docs/HARDWARE.md` M1 hardware notes
@@ -65,6 +66,14 @@ M1:
 - Module 12 = USB mass storage: code runs at 0x03083610 (code.bin 0x813E8), INQUIRY blocks at 0x03036790 (internal) / 0x030367B4 (SD).
 
 Device currently runs D1 (stock V1.7.8 + slot-2 diagnostic INQUIRY hook), stamp build 13. Next update must stamp build 14 or later. Read D1 with `python tools/inquiry.py D`.
+
+## Release plan (owner, 2026-11-07)
+
+- **v0.1: Zeal reskin of stock.** Stock audio engine and behaviour untouched; UI images restyled (boot splash, main menu icons, volume overlay, Now Playing, lists, status screens); stock block game reskinned; text colours patched. Layout stays stock.
+- **Later (≈ v0.2):** own UI code: compact 6px font, big scrolling titles, metadata browsing, new navigation, block game with wheel rotate.
+- **Later (≈ v0.3):** speed work: play-start delay, boot to music, screen push timing.
+
+Image section notes (V1.7.8): 478 images, 452 unique, 123 unique full screens. Most are unused Rockchip SDK leftovers (radio, recorder, video, blue theme). The AP30's own beige UI uses roughly: 000/002 boot and shutdown, 014–024 main menu states, 026/277 Now Playing art, 159/184/185 lists, 336–436 volume overlay (0–100), 003–007 USB and charging, 017 DAC, 437/438 updating, 451 clock.
 
 ## Decisions
 
