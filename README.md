@@ -76,6 +76,10 @@ Device currently runs D1 (stock V1.7.8 + slot-2 diagnostic INQUIRY hook), stamp 
 
 Image section notes (V1.7.8): 478 images, 452 unique, 123 unique full screens. Most are unused Rockchip SDK leftovers (radio, recorder, video, blue theme). The AP30's own beige UI uses roughly: 000/002 boot and shutdown, 014–024 main menu states, 026/277 Now Playing art, 159/184/185 lists, 336–436 volume overlay (0–100), 003–007 USB and charging, 017 DAC, 437/438 updating, 451 clock.
 
+## Public release concept (owner, 2026-11-07, for later)
+
+Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 from Hidizs; our tool verifies its SHA-256, applies our changes locally (art, recolour, code patches) and writes their own HIFIYF18.IMG with a newer stamp; install is the normal copy + restart (loader mode only documented for recovery). Primary installer: a static web patcher on GitHub Pages (runs in the browser, nothing uploaded, optional direct write to the device in Chrome); CLI for power users; GitHub Actions builds both. Also offer "back to stock" (official image, newer stamp). Before going public: rename away from Chrono Trigger names, strip diagnostic hooks, add a licence and disclaimer, scan git history for firmware, recruit testers on other units.
+
 ## Decisions
 
 - Approach: hybrid. Keep stock's audio engine (decoders on core B, DAC tuning); replace UI, navigation, library and play-start path
