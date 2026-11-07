@@ -144,7 +144,7 @@ go to stock FillRect; background drawn as 2 px runs). 6.8 KB code, 840 B data+ZI
 - Open: frame rate actually reached on device, whether stock's FillRect is fast enough, wheel direction,
   stopping the wheel from changing volume, best time kept only while the game is open.
 
-## Background music (owner, 2026-11-07)
+## Background music (owner, 2026-11-07) - release v0.21
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays
 resident above the game's code window, so no decoder of our own).
