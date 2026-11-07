@@ -49,7 +49,7 @@ M1:
 - [x] Display (static part): 296×240 RGB565 RAM framebuffer, DMA to LCD FIFO 0x6009000C, panel driver chosen from a flash table at boot. Open: controller model, bus speed (measure on device)
 - [x] Memory: ≈ 622 KB core A SRAM in use, ≈ 180 KB core B; the "whole image in RAM" model and the 16 KB free block were disproved on device by H0/H0a
 - [x] Arm GNU Toolchain 13.3.Rel1 installed and verified (see docs/HARDWARE.md)
-- [ ] Run custom code from a loaded location (H0/H0a in the code.bin gap failed: gap not loaded)
+- [ ] Run custom code from a loaded location. H0/H0a in the code.bin gap failed (gap never loaded; its assumed RAM address is past the 640 KB end). H1: hook loaded by stock via empty module slot 2 to free RAM 0x0309F800 (built, build 12, not yet tested)
 - [ ] On-device measurements (diagnostic build): CPU clock, full-frame blit time, raw ADC for button pairs, play-path timing
 - [ ] Power / battery / charging (read-only)
 - [ ] docs/HARDWARE.md

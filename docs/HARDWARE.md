@@ -133,6 +133,13 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 - Key wiring: are simultaneous presses limited by hardware
 - Amp (RT6863) enable/mute GPIO and timing
 
+## Module loading (ModuleOverlay)
+
+- **RAM ends at 0x030A0000 (640 KB).** Stack top / initial SP = 0x03004000 (stack below module 0 data). Highest module run end = 0x0309F7CC (module 39). 0x0309FFF0 holds 4 magic words written before a reset (module 0 @0x03053DE8, read by module 1). **Free: 0x0309F800–0x0309FFF0 (2032 bytes)**, no literal in the image points there.
+- `ModuleOverlay(n, type)` = **0x030683DE** (wrapper 0x030684E4, returns 0). Reads the 512-byte first sector of the code section from flash (base at `*0x03022864`, word 0 = 0x03050000), then table entry n at base + 8 + 32n, and copies **from flash**: type bit 0 code (cl → ce, cs), bit 1 data (dl → de, ds), bit 2 zero ZI (ze, zs). Copy routine 0x0306836A(flash offset, dst, len); flash byte read 0x03068194(0x30000, offset, len, buf). "Load" addresses are file positions (minus 0x03050000), never RAM.
+- 0x0307E300 is a FAT sector cache (512 B buffer, +0x200 dirty flag, +0x204 cached sector), so module 0 cannot grow past 0x0307E300.
+- **Empty slot 2 is loaded with type 7 in 21 places**, notably module 10's USB start (0x03081670 ModuleOverlay(12), 0x03081678 ModuleOverlay(2), then the handler). Pointing slot 2 at bytes in the file gap with run address 0x0309F800 makes stock load our code itself (`build_hook.py h1`). Empty slot 43 is loaded once (module 33).
+
 ## Device experiments log
 
 - **H0 / H0a (2026-11-07), build 11.** Hook in the code.bin 0x57B8C gap, BL at 0x03083978 redirected. Both hang USB mass storage (see Memory). First H0 copy-update was silently consumed without flashing (battery was flat; device would not power on until charged). Second attempt flashed both slots.
