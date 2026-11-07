@@ -87,7 +87,8 @@ def main():
     os.makedirs(out, exist_ok=True)
     t = THEMES["zeal"]
     boot = scene(t)
-    boot.text("v0.1", W - tw("v0.1") - 3, H - 9, t["border"])
+    # rounded bezel: keep corner text well inside (owner saw v0.1 clipped at 3 px)
+    boot.text("v0.1", W - tw("v0.1") - 12, H - 14, t["border"])
     boot.image().save(os.path.join(out, "000.png"))
     bye = scene(t)
     msg = "Goodbye"
