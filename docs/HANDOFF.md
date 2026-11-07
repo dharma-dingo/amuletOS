@@ -35,7 +35,7 @@ the next boot (the screen can stay black for a minute or two) and deletes the fi
 stamp must be newer than the installed one.**
 
 - Stamp format: `YY YY DD MM BB 00 00 00`, BCD, year little-endian, then day, month, build.
-  Today's builds use `26 20 07 11 BB`. Next free build number: **18** (`2620071118000000`).
+  Today's builds use `26 20 07 11 BB`. Next free build number: **19** (`2620071119000000`).
 - **Low battery makes the updater silently eat the file without flashing.** Charge first.
 - Pressing **B on the USB-transfer screen drops USB** (goes back to the main menu).
 
@@ -74,7 +74,8 @@ python art/menu_panels.py build/art_v01
 python art/recolor.py build/img_stock build/art_v01 build/art_v01_auto
 # merge: auto first, then hand-made on top
 mkdir build/art_v01_all; cp build/art_v01_auto/*.png build/art_v01_all/; cp build/art_v01/*.png build/art_v01_all/
-python tools/build_reskin.py build/d1 build/art_v01_all 2620071117000000 --out build/v017 --font bold1x
+python tools/patch_code.py build/d1 build/d1np np_hide_album_genre,np_title_not_filename
+python tools/build_reskin.py build/d1np build/art_v01_all 2620071118000000 --out build/v018 --font tall
 ```
 
 ---
@@ -161,6 +162,7 @@ been on an August build).
 | 15 | …15 | D1 + full v0.1 reskin | art-book "beautiful", menu order wrong |
 | 16 | …16 | build 15 + menu mapping fix + no subtitles | passed (owner: menu panels and text OK) |
 | 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | installed; font replaced everywhere but **too small to read** (owner): needs a bigger font |
+| 18 | …18 | build 16 art + tall font (`--font tall`, `art/font_tall.py`) + Now Playing patches (`tools/patch_code.py np_hide_album_genre,np_title_not_filename`) | built and verified on PC (`build/v018`); not on device |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX

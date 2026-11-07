@@ -165,6 +165,21 @@ directly by code point (record n = U+n). Neither the v0.1 image reskin nor recol
 glyphs and their advance widths. Still unknown: which screens use which font, and how stock lays
 out text wider than its current advances (clipping or scrolling).
 
+## Stock Now Playing (module 27), traced 2026-11-07
+
+- Window descriptor: tick 0x030823BE, service 0x03083688, paint 0x030835EC, init 0x030815C4, deinit 0x03081658.
+- Text draw: 0x03063F76(rect*, rect*, str16, mode) in a rect {x0, y0, x1, y1}; 0x030644A0 draws a fallback when a
+  string is empty; 0x030648EC clears a line area.
+- Info box (0x030829AC): three lines in x 168..296 at y 91 / 112 / 133 from the tag record at 0x03048580:
+  line 1 artist (+0x15E), line 2 album (+0x25C), line 3 genre (+0x35A), 0x40 UTF-16 chars each.
+- Scrolling line at y 172..187 (0x03083422): one mode draws the long file name (0x030248FC, filled by 0x030639C2),
+  the other the title buffer 0x03048450.
+- Library record (module 34, 0x0308FA50): read from the hidden FAT volume; +0x400 (128 B) title -> 0x03048450,
+  +0x500 artist -> 0x03048580+0x15E, +0x600 album -> +0x25C. A second path (0x0308FAF6) fills the title via 0x0305C364.
+- Build 18 patches (`tools/patch_code.py`): NOP the album and genre draws and their fallbacks; literal 0x030248FC at
+  0x03083550 -> 0x03048450 so the scrolling line always shows the title. Unknown until tested: whether the title
+  buffer is filled when playing from Folders.
+
 ## Module loading (ModuleOverlay)
 
 - **RAM ends at 0x030A0000 (640 KB).** Stack top / initial SP = 0x03004000 (stack below module 0 data). Highest module run end = 0x0309F7CC (module 39). 0x0309FFF0 holds 4 magic words written before a reset (module 0 @0x03053DE8, read by module 1). **Free: 0x0309F800–0x0309FFF0 (2032 bytes)**, no literal in the image points there.

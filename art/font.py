@@ -88,12 +88,30 @@ def encode(ch, rows_total, scale, top, caps_only=False, bold=False):
             out[y] |= (v | ((v >> 1) & ~(v << 1) & 0xFFFF)) if bold else v   # bold: widen strokes, keep 1-px gaps open
     return out, (w + 1) * scale + (1 if bold else 0)
 
-# Styles: (name, font1 scale/top/caps, font0 scale/top/caps)
+def encode_tall(ch, rows_total, top, bold=True):
+    """stock record rows and advance from font_tall.TALL (12-row glyphs, up to 6 columns)."""
+    from font_tall import TALL
+    rows = TALL.get(ch)
+    if rows is None: return None
+    cols = [c for c in range(len(rows[0])) if any(r[c] == "#" for r in rows)]
+    left, width = cols[0], cols[-1] - cols[0] + 1
+    out = [0] * rows_total
+    for r, line in enumerate(rows):
+        y = top + r
+        if not 0 <= y < rows_total: continue
+        v = 0
+        for c in range(left, len(line)):
+            if line[c] == "#": v |= 0x8000 >> (c - left)
+        out[y] = (v | ((v >> 1) & ~(v << 1) & 0xFFFF)) if bold else v
+    return out, width + 1 + (1 if bold else 0)
+
+# Styles: (name, font1 scale/top/caps, font0 scale/top/caps); "tall" uses font_tall in both
 STYLES = {
     "caps2x":  dict(f1=(2, 0, True),  f0=(1, 2, True)),
     "mixed2x": dict(f1=(2, 0, False), f0=(1, 2, False)),
     "mixed1x": dict(f1=(1, 4, False), f0=(1, 2, False)),
     "bold1x":  dict(f1=(1, 4, False, True), f0=(1, 2, False)),
+    "tall":    dict(tall=True, f1=3, f0=0),
 }
 
 def patch_fonts(font0: bytes, font1: bytes, style: str):
@@ -102,7 +120,7 @@ def patch_fonts(font0: bytes, font1: bytes, style: str):
     for cp in range(0x21, 0x7F):
         ch = chr(cp)
         for buf, rec, rows, spec in ((f1, 33, 16, st["f1"]), (f0, 32, 12, st["f0"])):
-            e = encode(ch, rows, *spec)
+            e = encode_tall(ch, rows, spec) if st.get("tall") else encode(ch, rows, *spec)
             if e is None: continue
             bm, adv = e
             o = cp * rec
@@ -137,10 +155,12 @@ def preview(outdir):
                "Radical Dreamers - Le Tresor Interdit", "03:12 / 04:05  FLAC 16/44"]
     lines12 = ["Battery 87%  Volume 42  EQ: Rock", "Updating library... 1203 files"]
     panel, ink, frame = (255, 253, 246), (18, 26, 64), (40, 60, 136)
-    sets = [("stock", s0, s1)] + [(n, *patch_fonts(s0, s1, n)) for n in STYLES]
+    names = sys.argv[3].split(",") if len(sys.argv) > 3 else list(STYLES)
+    sets = [("stock", s0, s1)] + [(n, *patch_fonts(s0, s1, n)) for n in names]
     titles = {"stock": "Stock (now)", "caps2x": "A  Capitals, 2x (mockup)",
               "mixed2x": "B  Upper + lower, 2x", "mixed1x": "C  Upper + lower, 1x (stock size)",
-              "bold1x": "D  Upper + lower, 1x bold (small text stays C)"}
+              "bold1x": "D  Upper + lower, 1x bold (build 17)",
+              "tall": "E  Tall: fills stock's cell (proposed build 18)"}
     shots = []
     for name, f0, f1 in sets:
         px = np.zeros((240, 296, 3), np.uint8); px[:] = panel
