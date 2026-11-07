@@ -143,7 +143,9 @@ go to stock FillRect; background drawn as 2 px runs). 6.8 KB code, 840 B data+ZI
 - Drawing: paint renders only what changed (renderer cache); full redraw on window open.
 - Build 22 on device: plays well, but about every other piece jumped back or dropped: pressing or releasing one
   ladder button sweeps the voltage through the others (Right -> idle passes Up, Left, Down), and a raw sample
-  can land mid-sweep. Build 23 accepts a ladder state only after it has been stable for 16 ms.
+  can land mid-sweep. Build 23 accepts a ladder state only after it has been stable for 16 ms; still seen (worst after
+  a hard drop: releasing Up). Build 24: direction-aware: a change to a higher-value button while one is held is
+  treated as a release (80 ms), a press needs 24 ms (Down 40 ms), going idle 16 ms. Simulated in `game/test/test_ladder.c`.
 - INFO page (build 23): pause, then Left. Read-only dump of stock's play state (source type, folder depth,
   file index, record cluster/file, FS type/current cluster/depth, folder stacks, disk, path) for wiring v0.21.
 - Open: frame rate actually reached on device, whether stock's FillRect is fast enough, wheel direction,

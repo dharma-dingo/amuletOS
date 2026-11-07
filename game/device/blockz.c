@@ -47,7 +47,14 @@ static struct {
     uint32_t seed;
 } S;
 
-#define ADC_STABLE_US 16000
+/* Ladder debounce. Releasing a button sweeps the voltage UP the ladder (Right 0 -> Up 119 -> Left 241 ->
+ * Down 364 -> others -> idle 1023) and pressing sweeps it DOWN from idle; the rubber pads can make either
+ * sweep slow. So a change towards a higher-value button while one is held is almost always a release in
+ * progress (owner: jumps right after a hard drop = Up being released through Left/Down). */
+#define DB_IDLE_US     16000     /* any button -> idle */
+#define DB_PRESS_US    24000     /* idle -> button, or to a lower-value button (a second press wins) */
+#define DB_DOWN_US     40000     /* idle -> Down: a false Down drops the piece to the floor */
+#define DB_UPLADDER_US 80000     /* held button -> higher-value button: treat as release unless it stays */
 
 /* libc pieces the compiler may emit for struct copies */
 void *memcpy(void *d, const void *s, unsigned n) { uint8_t *a = d; const uint8_t *b = s; while (n--) *a++ = *b++; return d; }
@@ -80,12 +87,33 @@ static uint8_t decode_adc(uint16_t a)
     return 0;
 }
 
-static void poll_adc(uint32_t now)
+static int ladder_rank(uint8_t k)          /* position on the ladder, low voltage first; idle last */
 {
-    uint8_t k = decode_adc(ADC_CH1);
-    if (k != S.adc_cand) { S.adc_cand = k; S.adc_since = now; }
-    else if (k != S.adc_state && now - S.adc_since >= ADC_STABLE_US) S.adc_state = k;
+    switch (k) {
+    case IN_RIGHT: return 0;
+    case 0x80:     return 1;   /* Up */
+    case IN_LEFT:  return 2;
+    case IN_DOWN:  return 3;
+    case 0x40:     return 4;   /* Select, Start, B, A */
+    default:       return 5;   /* idle */
+    }
 }
+
+static void poll_adc_raw(uint32_t now, uint16_t raw)
+{
+    uint8_t k = decode_adc(raw);
+    if (k != S.adc_cand) { S.adc_cand = k; S.adc_since = now; return; }
+    if (k == S.adc_state) return;
+    int from = ladder_rank(S.adc_state), to = ladder_rank(k);
+    uint32_t need;
+    if (to == 5)          need = DB_IDLE_US;
+    else if (from == 5)   need = (k == IN_DOWN) ? DB_DOWN_US : DB_PRESS_US;
+    else if (to > from)   need = DB_UPLADDER_US;
+    else                  need = DB_PRESS_US;
+    if (now - S.adc_since >= need) S.adc_state = k;
+}
+
+static void poll_adc(uint32_t now) { poll_adc_raw(now, ADC_CH1); }
 
 static uint8_t held_from_adc(void)
 {

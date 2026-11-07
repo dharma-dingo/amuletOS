@@ -27,6 +27,10 @@ def exe(name, srcs):
 def test():
     t = exe("test_core", CORE + [ROOT / "pc" / "bot.c", ROOT / "test" / "test_core.c"])
     run([t])
+    OUT.mkdir(parents=True, exist_ok=True)
+    lad = OUT / "test_ladder.exe"     # device shell's button debounce, compiled for the PC
+    run(ZIG + ["-O1", "-w", "-I", ROOT, "-o", lad, ROOT / "test" / "test_ladder.c"])
+    run([lad])
 
 def preview():
     from PIL import Image
