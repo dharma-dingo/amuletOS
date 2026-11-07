@@ -70,6 +70,7 @@ Device currently runs D1 (stock V1.7.8 + slot-2 diagnostic INQUIRY hook), stamp 
 ## Release plan (owner, 2026-11-07)
 
 - **v0.1: Zeal reskin of stock.** Stock audio engine and behaviour untouched; UI images restyled (boot splash, main menu icons, volume overlay, Now Playing, lists, status screens); stock block game reskinned; text colours patched. Layout stays stock.
+- **v0.2 block game (owner, 2026-11-07):** replace stock's block game module (module 82) with our own C game loaded through its module-table entry, so stock's menu launches it and stock music keeps playing. Gameplay inspired by Apotris (modern feel: 7-bag, hold, ghost piece, several next previews, hard drop on Up, rotate on the wheel so move + rotate works, tunable DAS/ARR and lock delay); look inspired by Tetris DX (Game Boy Color era: bevelled blocks, framed side panel, 8x8 tiles, Zeal palette). Original name, code and art only. First step: study module 82's interface to stock (how a game module gets key events and draws).
 - **Later (≈ v0.2):** own UI code: compact 6px font, big scrolling titles, metadata browsing, new navigation, block game with wheel rotate.
 - **Later (≈ v0.3):** speed work: play-start delay, boot to music, screen push timing.
 
@@ -84,4 +85,4 @@ Image section notes (V1.7.8): 478 images, 452 unique, 123 unique full screens. M
 
 ## Backlog (next version)
 
-- **Block game controls (face buttons can't combine, measured by D1).** Stock has the same limit. Options discussed 2026-11-07: (1) rotate on the volume wheel; (2) hybrid, wheel rotates plus A/B rotate when no direction is held (preferred); (3) face buttons only with DAS kept through brief direction release (avoid); (4) the GPIO2 pin 5 key as an extra rotate. Owner: Up = fast (hard) drop; details to settle during the build. Also: adjustable DAS/ARR, wheel = piece control in game with volume in the pause menu, ADC thresholds at midpoints of measured values. Open: wheel position/ergonomics, and which physical button the GPIO key is.
+- **Block game controls (face buttons can't combine, measured by D1; now part of the v0.2 block game).** Stock has the same limit. Options discussed 2026-11-07: (1) rotate on the volume wheel; (2) hybrid, wheel rotates plus A/B rotate when no direction is held (preferred); (3) face buttons only with DAS kept through brief direction release (avoid); (4) the GPIO2 pin 5 key as an extra rotate. Owner: Up = fast (hard) drop; details to settle during the build. Also: adjustable DAS/ARR, wheel = piece control in game with volume in the pause menu, ADC thresholds at midpoints of measured values. Open: wheel position/ergonomics, and which physical button the GPIO key is.
