@@ -64,9 +64,9 @@ Values marked **(owner?)** are proposals waiting for Brett's pick.
 
 | Setting | Presets | Proposed default |
 |---|---|---|
-| DAS | Slow 16f · Mid 11f · Fast 9f · Very fast 8f | Fast 9f **(owner?)** |
-| ARR | Slow 3f · Mid 2f · Fast 1f · Very fast 0.5f · Instant 0f | Fast 1f **(owner?)** |
-| Soft drop | same as ARR, added on top of gravity | Instant **(owner?)** |
+| DAS | Slow 16f · Mid 11f · Fast 9f · Very fast 8f | Fast 9f |
+| ARR | Slow 3f · Mid 2f · Fast 1f · Very fast 0.5f · Instant 0f | Fast 1f |
+| Soft drop | same as ARR, added on top of gravity | Instant |
 
 Directional delay (DAS resets on direction change): on. Initial hold/rotate (IHS/IRS): later.
 
@@ -78,8 +78,9 @@ Directional delay (DAS resets on direction change): on. Initial hold/rotate (IHS
 | Down | soft drop |
 | Up | hard drop (with drop protection: ignore a second hard drop within a few frames) |
 | A / B | rotate clockwise / counter-clockwise |
-| Wheel up / down | rotate clockwise / counter-clockwise (works while holding a direction) |
-| Select | hold **(owner?)** (or the GPIO key, once we know which button it is) |
+| Wheel up | hold (owner) |
+| Wheel down | unassigned for now |
+| Select | quit to menu (same as stock games) |
 | Start | pause menu (Resume, Retry, Quit) |
 
 ## Look
@@ -100,5 +101,5 @@ Directional delay (DAS resets on direction change): on. Initial hold/rotate (IHS
    to PNG / replays inputs, so rules are verified before the device.
 3. **Device shell:** window callbacks call the core once per frame; draw only changed cells
    (stock's fill is per-pixel); find the screen flush path for a steady 60 fps.
-4. **Wheel input** for rotation (read the encoder ourselves while the game runs, so it doesn't
+4. **Wheel input** for hold (read the encoder ourselves while the game runs, so it doesn't
    change volume), then the main menu's Games tile launches the game directly ("Block Game").
