@@ -194,6 +194,17 @@ out text wider than its current advances (clipping or scrolling).
   +0x5E, +0x19D..+0x1A5) into the record; then TaskSwitch(3, {index, 0x46}).
 - Files are opened by directory cluster + index (0x030598E6, "file open err: clus = %d, index = %d"); record +0x34 =
   directory cluster, +0x38 = file number (1-based). File system sources: Common\FileSys\{dir,FDT,fat,file}.c.
+- File system state (module 0): FS type byte 0x0307E710 (3 = exFAT, separate code paths), volume info 0x0307E71C
+  (root cluster at +0x0D), current directory cluster 0x0307F250, depth 0x0307EFC8, per-level table 0x0307EFD0
+  (71-byte entries, +0 total files, +2 ...). GotoRoot 0x0305B032(buf, type); type 1/2 = library (cluster 0),
+  otherwise root cluster from the volume info. FindFirst 0x0305BBF6(find*, &dirclus, ext, type) / FindNext
+  0x0305BBCA(...) wrap 0x0305B454(find*, next?, ext, type, [&dirclus, 3, type]); extension match 0x0305C800.
+  Long name by (dir cluster, index): 0x0305C364(clus, idx, type, out16) on FAT, 0x0305B2D0 on exFAT (library
+  scanner module 38 uses both with type 6). File count with the audio filter: 0x0305ADA8(0x030056EB, clus).
+- Disk: system config 0x03022894 +0x0E = active disk (2 internal, 4 SD), +0x1F = SD present, 0x03053C88() == 1
+  when the card is in, 0x03058526(disk) switches (MusicInit does this when the chosen disk has no files).
+- Owner's card (2026-11-07): exFAT, 128 GB; /_blockgame/ holds "Classic Theme.mp3" (any audio file there should
+  work: play the first in stock's file order).
 - Still needed for v0.21: find /_blockgame/ on the SD card (disk select, root cluster, directory entry lookup),
   the browser's file indexing (which entries count, order), and the exact source-type value; then fill the record
   and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
