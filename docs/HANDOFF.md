@@ -165,7 +165,7 @@ been on an August build).
 | 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | installed; font replaced everywhere but **too small to read** (owner): needs a bigger font |
 | 18 | …18 | build 16 art + tall font (`--font tall`, `art/font_tall.py`) + Now Playing patches (`tools/patch_code.py np_hide_album_genre,np_title_not_filename`) | installed: font size right (owner); Now Playing showed artist + **file name** (0x03048450 is the file name), album/genre hidden; genre icon, white strips past the panel and format line still to fix |
 | 19 | …19 | build 18 + Blockz test module T1 in module 82 (`tools/build_module.py build/d1np build/d1np_t1 game/device/test_module.c`) | superseded by 20 (never on device) |
-| 20 | …20 | build 18 fixes: title tag on the scrolling line with file-name fallback (`np_title_tag`, hooks/np_title.S), format line hidden (`np_hide_format`), Now Playing art: only the artist icon, panels run off the edge so the line strips (069, 028) blend in; + Blockz T1 | built and verified on PC (`build/v020`); not on device |
+| 20 | …20 | build 18 fixes: title tag on the scrolling line with file-name fallback (`np_title_tag`, hooks/np_title.S), format line hidden (`np_hide_format`), Now Playing art: only the artist icon, panels run off the edge so the line strips (069, 028) blend in; + Blockz T1 | copied to device (hash verified); owner to check Now Playing and the Blockz test screen |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX
