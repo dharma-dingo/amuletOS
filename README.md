@@ -93,4 +93,7 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
 
 ## Backlog (next version)
 
+- **Library update (owner, 2026-11-07):** stock forces a full "updating library" (~1 minute) even when nothing changed on the SD card. Find an elegant fix: skip the scan unless the user asks for it (an Update Library item in Settings), or only scan when a cheap check (card serial + root/folder timestamps or file count) shows a change. First step: find what triggers the scan at boot/card insert in stock (could be a small patch for v0.1/v0.2, before our own library code).
+- **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
+
 - **Block game controls (face buttons can't combine, measured by D1; now part of the v0.2 block game).** Stock has the same limit. Options discussed 2026-11-07: (1) rotate on the volume wheel; (2) hybrid, wheel rotates plus A/B rotate when no direction is held (preferred); (3) face buttons only with DAS kept through brief direction release (avoid); (4) the GPIO2 pin 5 key as an extra rotate. Owner: Up = fast (hard) drop; details to settle during the build. Also: adjustable DAS/ARR, wheel = piece control in game with volume in the pause menu, ADC thresholds at midpoints of measured values. Open: wheel position/ergonomics, and which physical button the GPIO key is.

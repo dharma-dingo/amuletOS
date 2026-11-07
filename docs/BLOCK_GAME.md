@@ -92,6 +92,34 @@ Directional delay (DAS resets on direction change): on. Initial hold/rotate (IHS
   palette (I cyan, O yellow, T purple, S green, Z red, J blue, L orange). Ghost = outlined cells.
 - Plain text labels only (HOLD, NEXT, TIME, LINES, PPS). No themed copy.
 
+## Status (2026-11-07)
+
+Portable core and renderer done and tested on the PC; not on the device yet.
+
+| File | What |
+|---|---|
+| `game/core.c/.h` | rules, freestanding C (no libc), one input bitmask per frame. ARM `-Os`: 2.5 KB code, no data |
+| `game/render.c/.h` | draws into a 296x240 RGB565 buffer, only what changed (cell cache, text cache, dirty rect). ARM `-Os`: 3.5 KB |
+| `game/test/test_core.c` | 87 checks: SRS states, kicks (wall, floor, I), 7-bag, spawn, lock delay + 15 resets + reset on a new low row, hard drop + drop protection, DAS/ARR (incl. 0.5f, instant), soft drop, gravity, line clears, hold, top-out, pause, 30 bot Sprints, determinism, incremental render == full render every frame |
+| `game/pc/bot.c` | demo/test bot (one face button at a time, same inputs as a player) |
+| `game/pc/preview.c` | bot Sprint -> PNG stills, contact sheet and GIF |
+| `game/pc/web.c`, `play.html` | the same core + renderer as wasm, playable in a browser with the AP30 one-button limit emulated and DAS/ARR/soft drop menus |
+| `game/build.py` | `test`, `preview`, `web`, `device` (ARM size + undefined-symbol check). Host compiler: zig (`pip install ziglang`) |
+
+Outputs go to `build/game_preview/` (play.html, sheet.png, replay.gif).
+
+Look decisions (owner, 2026-11-07): 11 px cells (well 110x220 at 93,10), ghost = 1 px outline in the piece
+colour, background = Zeal sky blue with the menu diamonds. Panels: left HOLD, TIME, LINES; right NEXT, PIECES,
+PPS, BEST. Labels and values use the 5x7 font at 2x.
+
+Behaviour details chosen while building (change if they feel wrong):
+- Spawn at rows 21/22 then drop one row at once (guideline), so the piece shows immediately.
+- READY 0.5 s, GO 0.5 s, GO stays up for the first 0.5 s of play; DAS charges during the countdown.
+- Hard drop protection: Up is ignored for 5 frames after a hard drop.
+- Lock delay: 15 resets with a full timer; the 16th grounded move locks at once; reaching a new lowest row restores them.
+- Result screen: A or Start = retry, B = quit. Pause: Up/Down + A, Start resumes.
+- Best time is kept across retries in RAM only.
+
 ## Engineering plan
 
 1. **Test module:** replace module 82 with a minimal C window (fills screen, prints text, reacts to

@@ -179,8 +179,12 @@ been on an August build).
 
 - **Device:** build 16 (v0.1 reskin + D1 diagnostics) was copied to the internal drive; the owner
   restarts to install. Build 15 was confirmed working before that. Next stamp: build 17.
-- **Repo:** everything committed; pushed through `5536755` except this handoff (commit it and ask
-  before pushing). `game/stock.h` (stock entry points for a game module) is uncommitted.
+- **Repo:** pushed through `5536755`; later commits (handoff, v0.2 game core) are local only (ask
+  before pushing).
+- **v0.2 game core (2026-11-07, later session):** §6.3 step 3 done on the PC: `game/core.c`,
+  `game/render.c`, tests (87 checks), bot preview and a playable browser build. See
+  `docs/BLOCK_GAME.md` "Status". Next: owner plays `build/game_preview/play.html`
+  (`python game/build.py web`), then §6.3 step 1 (minimal device test module) and step 2.
 - **Notion:** spec updated with Gate 1, M1 findings (corrected memory model, buttons, 200 MHz),
   release plan (v0.1 reskin, v0.2 own UI and block game, v0.3 speed), block game requirement.
 - **Memory (assistant):** project, owner preferences and feedback files are up to date.
