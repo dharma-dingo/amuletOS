@@ -7,6 +7,9 @@ Design mockups: https://claude.ai/artifact/REib6hwrurHvLUW9jQSEuJ
 
 - `firmware/` stock images from the Hidizs download center. Never commit or redistribute these.
 - `tools/ap30fw.py` image tool: `info`, `verify`, `unpack`, `pack [--stamp HEX16]`
+- `tools/rkread.py` read-only loader-mode client (backup); `tools/rkwrite.py` guarded loader-mode writer (recovery)
+- `tools/fwmap.py` function/string index; `tools/xref.py` caller trees; `tools/fwdis.py` annotated disassembly
+- `docs/HARDWARE.md` M1 hardware notes
 - `build/` scratch output (git-ignored)
 - `design/` UI mockups
 
@@ -37,6 +40,18 @@ The device never took V1.7.8.
 - [x] **Gate 1a**: V1.7.8 with USB vendor `HIFI MP3` → `SCHALAOS` (code.bin 0x8234C/0x823D4/0x823F8), stamp `26 20 07 11 09`, flashed via copy + reboot, enumerates as "SCHALAOS USB MP3". No code-section signature or checksum.
 - [x] **Gate 1b**: one instruction in module 12 (USB MSC overlay) at 0x03083952, `ldr r2,[pc,#0x1d8]` → `#0x1dc` (code.bin 0x8172A: 76→77), stamp build 10. Internal disk now enumerates as "SCHALAOS SD". **Gate 1 passed.**
 
+M1:
+- [x] **Recovery write path proven** (`tools/rkwrite.py wtest`): in loader mode, wrote a pattern to 64 free blank sectors (LBA 786432, inside the user FAT32), read back OK, restored 0xFF, re-read in a new session OK. Recovery = `rkwrite.py wl 0 <good image> --allow-any`.
+- [x] Function naming / analysis setup (`tools/fwmap.py`, `tools/xref.py`)
+- [ ] Audio path (DAC, amp, mute timing, play latency). In progress: DAC power-up runs on every music start; fixed waits ≈ 270 ms of the ~3 s. See docs/HARDWARE.md
+- [x] Buttons + volume wheel: 8 face buttons on one ADC ladder (ch1) + 1 GPIO key; wheel = quadrature encoder on GPIO2 pins 0/9. Simultaneous face-button presses likely impossible in hardware (to measure). See docs/HARDWARE.md
+- [x] Display (static part): 296×240 RGB565 RAM framebuffer, DMA to LCD FIFO 0x6009000C, panel driver chosen from a flash table at boot. Open: controller model, bus speed (measure on device)
+- [x] Memory: ≈ 622 KB core A SRAM in use, ≈ 180 KB core B; boot ROM loads the whole code image into RAM; free 16 KB block at RAM 0x030A7B8C (code.bin 0x57B8C)
+- [x] Arm GNU Toolchain 13.3.Rel1 installed and verified (see docs/HARDWARE.md)
+- [ ] On-device measurements (diagnostic build): CPU clock, full-frame blit time, raw ADC for button pairs, play-path timing
+- [ ] Power / battery / charging (read-only)
+- [ ] docs/HARDWARE.md
+
 ## Code layout
 
 - code.bin loads at 0x03050000. Word 1 = module count (113). Then 113 × 8 words: code load, code exec, code size, data load, data exec, data size, ZI exec, ZI size (load addresses are relative to 0x03050000 = code.bin offset 0).
@@ -47,5 +62,7 @@ Device currently runs the Gate 1b build (V1.7.8 + SCHALAOS vendor + LUN0 inquiry
 
 ## Decisions
 
-- Compact 6px font, big scrolling titles on Now Playing, no screen transitions
-- P0: sound within 300 ms of pressing play; every press redrawn within one frame
+- Approach: hybrid. Keep stock's audio engine (decoders on core B, DAC tuning); replace UI, navigation, library and play-start path
+- Scope: browse by metadata (Artist > Album > Track), M3U, fast play start, snappy nav, block game with background MP3; Game Boy emulation is M5
+- Look: Zeal Sky default palette with lavender accents, compact 6px font, big scrolling titles, no transitions, diamond pattern, arrow cursor, boot splash with floating islands
+- P0: sound within 300 ms of pressing play; every press redrawn within one frame; playable within 3 s of power-on
