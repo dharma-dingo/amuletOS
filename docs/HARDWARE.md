@@ -179,6 +179,26 @@ out text wider than its current advances (clipping or scrolling).
   (0x030827B0), and no module runs above 0x0309F7CC, so code linked into slot 2 at 0x0309F800 stays loaded.
   `tools/build_helpers.py` appends C helpers after the D1 hook (build 21: 384 B, slot size 0x20C of 0x7F0).
 
+## Starting music (partial trace for v0.21, 2026-11-07)
+
+- Music engine = module 33, entry `AudioControl(cmd, arg)` 0x0308BF84 (Now Playing calls it 14 times; e.g. cmd 0xF8
+  after volume changes). Audio Start 0x0308C8EE loads module 34 (library/file info), 0x0308FB0A, opens the file with
+  0x0308F810 (-1 = "Audio File Open Error", posts msg 0x4F).
+- The player runs as a stock thread: handle at 0x030232BC, descriptor 0x030361A4. Running test:
+  0x03057C7C(*0x030232BC, 0x030361A4) == 1 (stock block game uses the same check). Start (Now Playing init,
+  0x03081774): 0x03057C38(0x030232BC); ModuleOverlay(33, 7); 0x03057B96(0x030232BC, 0x030361A4, window arg).
+- Folder browser play request (m31 0x0308236A): music source record 0x03022F14: +0xF2 = source type (browser
+  value from its context +0x89; module 34 treats 0x63 and 6 specially), path copy (0x80 UTF-16) to 0x03022BBA,
+  +0x10 = 0x030056C0 (browser folder state), +6 = file index, 0x03080644 = context +0x197; then 0x03055304 copies the
+  folder stack from the system config 0x03022894 (+0x79/+0x7D, depth +0x18B, cluster stack +0x81/+0x18D, +0x195,
+  +0x5E, +0x19D..+0x1A5) into the record; then TaskSwitch(3, {index, 0x46}).
+- Files are opened by directory cluster + index (0x030598E6, "file open err: clus = %d, index = %d"); record +0x34 =
+  directory cluster, +0x38 = file number (1-based). File system sources: Common\FileSys\{dir,FDT,fat,file}.c.
+- Still needed for v0.21: find /_blockgame/ on the SD card (disk select, root cluster, directory entry lookup),
+  the browser's file indexing (which entries count, order), and the exact source-type value; then fill the record
+  and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
+  (stock FileWrite exists) to dump these structures after playing a file from Folders.
+
 ## Stock Now Playing (module 27), traced 2026-11-07
 
 - Window descriptor: tick 0x030823BE, service 0x03083688, paint 0x030835EC, init 0x030815C4, deinit 0x03081658.
