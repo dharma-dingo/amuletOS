@@ -162,7 +162,7 @@ been on an August build).
 | 15 | …15 | D1 + full v0.1 reskin | art-book "beautiful", menu order wrong |
 | 16 | …16 | build 15 + menu mapping fix + no subtitles | passed (owner: menu panels and text OK) |
 | 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | installed; font replaced everywhere but **too small to read** (owner): needs a bigger font |
-| 18 | …18 | build 16 art + tall font (`--font tall`, `art/font_tall.py`) + Now Playing patches (`tools/patch_code.py np_hide_album_genre,np_title_not_filename`) | built and verified on PC (`build/v018`); not on device |
+| 18 | …18 | build 16 art + tall font (`--font tall`, `art/font_tall.py`) + Now Playing patches (`tools/patch_code.py np_hide_album_genre,np_title_not_filename`) | copied to device (hash verified); owner to check font size and Now Playing |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX
