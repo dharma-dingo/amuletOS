@@ -51,6 +51,11 @@ static void dirty(int x, int y, int w, int h)
     if (y + h > RC->y1) RC->y1 = y + h;
 }
 
+#ifdef BG_FILL_EXTERN
+/* device: every pixel goes through the platform's rectangle fill (stock FillRect) */
+void bg_fill_rect(int x, int y, int w, int h, uint16_t rgb565);
+#endif
+
 static void fill(int x, int y, int w, int h, uint32_t c)
 {
     uint16_t v = RGB(c);
@@ -59,10 +64,14 @@ static void fill(int x, int y, int w, int h, uint32_t c)
     if (x + w > BG_SCR_W) w = BG_SCR_W - x;
     if (y + h > BG_SCR_H) h = BG_SCR_H - y;
     if (w <= 0 || h <= 0) return;
+#ifdef BG_FILL_EXTERN
+    bg_fill_rect(x, y, w, h, v);
+#else
     for (int j = 0; j < h; j++) {
         uint16_t *p = FB + (y + j) * STRIDE + x;
         for (int i = 0; i < w; i++) p[i] = v;
     }
+#endif
     dirty(x, y, w, h);
 }
 
@@ -109,18 +118,23 @@ static void text(int x, int y, const char *s, uint32_t c)
 static void text_c(int x, int w, int y, const char *s, uint32_t c) { text(x + (w - text_w(s)) / 2, y, s, c); }
 
 /* ---- shapes ---- */
+static int diamond_on(int x, int y)
+{
+    int ax = x >> 1, ay = y >> 1, tx = ax & 7, ty = ay & 7;
+    int m2 = (tx * 2 - 7 < 0 ? 7 - tx * 2 : tx * 2 - 7) + (ty * 2 - 7 < 0 ? 7 - ty * 2 : ty * 2 - 7); /* 2*manhattan */
+    return m2 <= 3 || (m2 >= 6 && m2 <= 7 && (((ax >> 3) + (ay >> 3)) & 1));
+}
+
+/* sky blue with the menu diamonds, as horizontal runs (2 px tall: the art grid is 2x) */
 static void background(void)
 {
-    for (int y = 0; y < BG_SCR_H; y++) {
-        uint16_t *p = FB + y * STRIDE;
-        for (int x = 0; x < BG_SCR_W; x++) {
-            int ax = x >> 1, ay = y >> 1, tx = ax & 7, ty = ay & 7;
-            int m2 = (tx * 2 - 7 < 0 ? 7 - tx * 2 : tx * 2 - 7) + (ty * 2 - 7 < 0 ? 7 - ty * 2 : ty * 2 - 7); /* 2*manhattan */
-            int on = m2 <= 3 || (m2 >= 6 && m2 <= 7 && (((ax >> 3) + (ay >> 3)) & 1));
-            p[x] = on ? RGB(C_BG2) : RGB(C_BG1);
+    for (int y = 0; y < BG_SCR_H; y += 2) {
+        int x0 = 0, on0 = diamond_on(0, y);
+        for (int x = 2; x <= BG_SCR_W; x += 2) {
+            int on = x < BG_SCR_W ? diamond_on(x, y) : !on0;
+            if (on != on0) { fill(x0, y, x - x0, 2, on0 ? C_BG2 : C_BG1); x0 = x; on0 = on; }
         }
     }
-    dirty(0, 0, BG_SCR_W, BG_SCR_H);
 }
 
 /* framed panel with cut corners: 2 px edge */

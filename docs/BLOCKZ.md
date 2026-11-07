@@ -132,6 +132,18 @@ Screen: palette swatches, then live TICK, SVC, TIME (0x0302288C), KEY/PREV (last
 (raw ch1), WHEEL (0x030226E4/E5, total), EVENTS. Answers: does the window contract work, the tick and
 service rates, the GetKey event types, whether the ladder can be polled for held keys, wheel counters.
 
+## Device build T2 (build 22)
+
+`game/device/blockz.c` includes core.c and render.c (unity build, `BG_FILL_EXTERN`: the renderer's fills
+go to stock FillRect; background drawn as 2 px runs). 6.8 KB code, 840 B data+ZI (limit 0x708).
+- Timing: fixed 60 fps steps from the SysTick clock (10 ms ticks + VAL), max 6 frames catch-up.
+- Input: Left/Right/Down held from ADC ch1 (Right < 60, Up < 180, Left < 302, Down < 426); A, B, Up, Start
+  as GetKey press events (type 0x40) applied to the next frame; Select (0x40 or 0x20) quits to the main menu;
+  any wheel step = hold (the wheel still changes volume in T2).
+- Drawing: paint renders only what changed (renderer cache); full redraw on window open.
+- Open: frame rate actually reached on device, whether stock's FillRect is fast enough, wheel direction,
+  stopping the wheel from changing volume, best time kept only while the game is open.
+
 ## Background music (owner, 2026-11-07)
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays

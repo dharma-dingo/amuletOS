@@ -9,7 +9,11 @@ typedef struct { uint16_t x0, y0, x1, y1; } rect_t;
 #define DRAW(a, b, s, m) ((void (*)(rect_t *, rect_t *, const uint16_t *, uint32_t))(0x03063F76u | 1))(a, b, s, m)
 #define TITLE   ((uint16_t *)0x030485E0)          /* tag record +0x60: title from the file's tags */
 #define FNAME   ((const uint16_t *)0x03048450)    /* library record +0x400: file name */
+#define CLEAR(img, x, y) ((void (*)(uint32_t, uint32_t, uint32_t))(0x030648ECu | 1))(img, x, y)
+#define STRIP   69                                /* stock's 128x16 line-clear image (panel fill in our art) */
 #define LINE_GAP 21                               /* info box line pitch (y 91 / 112 / 133) */
+#define LIFT    42                                /* owner: artist from line 1 up two lines (y 49), album
+                                                     from line 3 up two (y 91), each wrapping over 2 lines */
 #define MAXC    64                                /* stock copies 0x40 chars of the artist */
 
 /* title empty -> use the file name */
@@ -31,9 +35,12 @@ uint32_t np_title_width(void)
     return TEXTW(TITLE);
 }
 
-/* replaces the artist draw (line 1): wraps onto line 2 at a space, or mid-word if one word is too long */
-void np_artist(rect_t *r, rect_t *r2, const uint16_t *s, uint32_t mode)
+/* draw s in rect r over up to two lines: wraps at a space, or mid-word if one word is too long */
+static void wrap2(rect_t *r, const uint16_t *s, uint32_t mode)
 {
+    CLEAR(STRIP, r->x0, r->y0);                         /* stock only clears y 91/112/133 */
+    CLEAR(STRIP, r->x0, r->y0 + LINE_GAP);
+    rect_t *r2 = r;
     int w = r->x1 - r->x0;
     if ((int)TEXTW(s) <= w) { DRAW(r, r2, s, mode); return; }
 
@@ -61,4 +68,22 @@ void np_artist(rect_t *r, rect_t *r2, const uint16_t *s, uint32_t mode)
     rect_t l2 = *r;
     l2.y0 += LINE_GAP; l2.y1 += LINE_GAP;
     DRAW(&l2, &l2, s + next, mode);
+}
+
+static void lifted(rect_t *r, const uint16_t *s, uint32_t mode)
+{
+    rect_t t = *r;
+    t.y0 -= LIFT; t.y1 -= LIFT;
+    wrap2(&t, s, mode);
+}
+
+/* replace the artist draw (line 1 rect) and the album draw (line 3 rect, source switched to album) */
+void np_artist(rect_t *r, rect_t *r2, const uint16_t *s, uint32_t mode) { lifted(r, s, mode); }
+void np_album(rect_t *r, rect_t *r2, const uint16_t *s, uint32_t mode)  { lifted(r, s, mode); }
+
+/* replaces the empty-artist fallback: clear the lifted artist lines (y 49 / 70), which stock never clears */
+void np_clear_artist(void)
+{
+    CLEAR(STRIP, 0xA8, 91 - LIFT);
+    CLEAR(STRIP, 0xA8, 91 - LIFT + LINE_GAP);
 }

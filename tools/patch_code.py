@@ -98,7 +98,17 @@ def np_v2():
         (27, 0x03083554, "50840403", "e0850403"),                                           # mode-0 literal -> title
     ]
 
-GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2}
+def np_v3():
+    """np_v2 plus: artist at y 49 and album at y 91, both wrapping over two lines (np_helpers.c LIFT);
+    empty-string fallbacks skipped (they would draw at the old line positions)."""
+    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    return np_v2() + [
+        (27, 0x03082AC6, "e1f756fa", thumb_bl(0x03082AC6, h["np_album"]).hex()),           # line 3 draw -> album helper
+        (27, 0x03082AE0, "e1f7defc", thumb_bl(0x03082AE0, h["np_clear_artist"]).hex()),    # line 1 empty: clear lifted lines
+        (27, 0x03082B04, "e1f7ccfc", NOP2),                                                 # line 3 empty fallback
+    ]
+
+GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)
