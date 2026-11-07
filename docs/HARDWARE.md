@@ -150,6 +150,21 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 - Key wiring: are simultaneous presses limited by hardware
 - Amp (RT6863) enable/mute GPIO and timing
 
+## Fonts (font0 / font1 sections, decoded 2026-11-07)
+
+Stock draws all UI text at run time from two bitmap fonts covering the Unicode BMP, indexed
+directly by code point (record n = U+n). Neither the v0.1 image reskin nor recolour touched them.
+
+| Section | Size | Record | Glyph | Width byte |
+|---|---|---|---|---|
+| `font0.bin` | 2,104,326 B | 32 B | 12 rows x 16 bits, big-endian, bit 15 = left | byte 24 = 0x80 + advance (A = 0x87) |
+| `font1.bin` | 2,169,862 B | 33 B | 16 rows x 16 bits | byte 32 = 0x80 + advance (A = 0x88) |
+
+65536 records each, plus 7174 trailing bytes (not yet decoded). U+0000 is a box glyph.
+A data-only font fix is possible: overwrite the ASCII records (U+0020..U+007E) with original
+glyphs and their advance widths. Still unknown: which screens use which font, and how stock lays
+out text wider than its current advances (clipping or scrolling).
+
 ## Module loading (ModuleOverlay)
 
 - **RAM ends at 0x030A0000 (640 KB).** Stack top / initial SP = 0x03004000 (stack below module 0 data). Highest module run end = 0x0309F7CC (module 39). 0x0309FFF0 holds 4 magic words written before a reset (module 0 @0x03053DE8, read by module 1). **Free: 0x0309F800–0x0309FFF0 (2032 bytes)**, no literal in the image points there.
