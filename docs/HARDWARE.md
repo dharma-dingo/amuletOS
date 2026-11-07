@@ -78,9 +78,26 @@ Interrupts: vector = 16 + SDK INT_ID (SRADC 36, MAILBOX0-3 25-28, I2S1 48, GPIO2
 | 320–429 | 0x020 | | 850–949 | 0x080 |
 | ≥ 950 | none | | | |
 
-Plus one key on **GPIO2 pin 5** (code 0x001), checked first. Code → physical button mapping still to be confirmed on device.
+Plus one key on **GPIO2 pin 5** (code 0x001), checked first.
 
-**Consequences.** One ladder means two face buttons pressed together give a single combined voltage, so most simultaneous presses cannot be read (hardware limit, not just the stock single-key driver). Matters for the block game (move + rotate) and Game Boy (direction + A). To measure: log raw ch1 values for button pairs in the first diagnostic build; some pairs may land in distinct gaps.
+**Measured on device (D1, 2026-11-07, raw 10-bit ch1, idle = 0x3FF):**
+
+| Button | Raw | Stock code |
+|---|---|---|
+| Right | 0 | 0x004 |
+| Up | 118–119 | 0x010 |
+| Left | 240–242 | 0x008 |
+| Down | 364 | 0x020 |
+| Select | 486–492 | 0x002 |
+| Start | 661–680 | 0x100 |
+| B | not measured (exits USB mode); by elimination | 0x040 |
+| A | 854–855 | 0x080 |
+
+Start and A sit at stock's band edges; SchalaOS should use midpoints between measured values. The volume wheel does not touch ch1.
+
+**Simultaneous face-button presses cannot be read (confirmed).** Every pair reads as its lower-value member: Up+A → Up, Right+A → Right, Left+Select → Left, Up+Right → Right, Down+Start → Down, Select+Start → Select. Series ladder: priority Right > Up > Left > Down > Select > Start > B > A, so A is masked by any other face button. Inputs that can combine with a face button: the volume wheel (GPIO encoder) and the GPIO2 pin 5 key.
+
+**Consequences.** Hardware limit, confirmed on device: one face button at a time. Block game: rotate on the wheel (or the GPIO key) so move + rotate works. Game Boy: direction + A/B is impossible on the face buttons; A/B would have to move to the wheel / GPIO key.
 Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then every 2 ticks.
 
 **Volume wheel = quadrature encoder on GPIO2 pins 0 (A) and 9 (B)**, polled from the system timer: 0x030534AC configures the pins as inputs and compares A/B with the previous sample (0x0306FBCC / 0x03004144), counting steps per direction at 0x030226E5 / 0x030226E4 (total 0x030226E8). Responsiveness depends on the poll rate.
@@ -115,9 +132,9 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 | Question | Status |
 |---|---|
 | RAM | **Unknown again.** The >1 MB figure relied on the disproved load model; ≈ 622 KB core A in use; GB Color needs ~48 KB console RAM + bank cache |
-| CPU clock | Unknown. DelayMs reads it from a clock variable; measure on device |
+| CPU clock | **200 MHz** in USB mode (D1, `*(0x030065C0+0x18)` = 0x0BEBC200). Music-mode clock still to check |
 | Display push speed | Unknown. Measure a full-frame DMA blit on device |
-| Simultaneous buttons | **Risk.** All 8 face buttons share one ADC ladder; most pairs likely unreadable. Measure raw pair values |
+| Simultaneous buttons | **Blocked on face buttons (measured).** Series ladder, lowest wins. Only the wheel and the GPIO key can combine with a face button |
 
 ## Flash and recovery
 
@@ -146,4 +163,5 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 - **Sector patching in loader mode works.** The flash copy of a slot is the IMG without its CRC trailer (slot offset 0x1C00000 holds unrelated data), so a change confined to one sector can be written directly with `rkwrite.py wl <slot LBA + sector> <512-byte file> --allow-any` (fw1 LBA 0, fw2 LBA 0xF000). Used to switch H0 → H0a and then restore the stock BL sector (0x40C) in both slots.
 - **After a stalled read, the BootROM can drop off USB or fail the descriptor request.** Power off fully (hold 10 s) and replug; send `td` before the first read.
 - **H1 (2026-11-07), build 12: PASSED.** Same INQUIRY-swap hook, linked at 0x0309F800 and loaded through module slot 2 (`build_hook.py h1`). Normal copy-update, booted normally; internal disk enumerates as `SCHALAOS ZEAL HOOK` rev `0.1`, SD stays `HIFI MP3 SD`. First custom code running on the AP30. Also shows USB DMA reads fine from 0x0309Fxxx.
-- Device now: H1, stamp `26 20 07 11 12`.
+- **D1 (2026-11-07), build 13: PASSED.** INQUIRY name = `<clock hex> <ch1 hex> <ch0 hex>`, rev `D1`. Read live without admin and without replugging with `tools/inquiry.py D [--loop N --changes]` (SCSI INQUIRY pass-through on \.\D:). Results: clock 200 MHz, battery ch0 ≈ 0x372 (≈ 4.3 V on USB), buttons above. The ADC sampler keeps running in USB mode. B on the USB screen exits to the main menu (drops USB). The prompt appeared in Chinese after this update (settings likely reset by updates; to check).
+- Device now: D1, stamp `26 20 07 11 13`.

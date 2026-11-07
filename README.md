@@ -9,6 +9,7 @@ Design mockups: https://claude.ai/artifact/REib6hwrurHvLUW9jQSEuJ
 - `tools/ap30fw.py` image tool: `info`, `verify`, `unpack`, `pack [--stamp HEX16]`
 - `tools/rkread.py` read-only loader-mode client (backup); `tools/rkwrite.py` guarded loader-mode writer (recovery)
 - `tools/build_hook.py` assembles a `hooks/*.S` hook into the code.bin 0x57B8C gap (proven NOT loaded at run time, needs a new location), redirects its BL, packs and verifies (`build_hook.py h0 2620071111000000` → `build/h0/HIFIYF18.IMG`)
+- `tools/inquiry.py` sends a live SCSI INQUIRY to a drive letter (reads D1 diagnostics, no admin)
 - `tools/fwmap.py` function/string index; `tools/xref.py` caller trees; `tools/fwdis.py` annotated disassembly
 - `docs/HARDWARE.md` M1 hardware notes
 - `build/` scratch output (git-ignored)
@@ -50,7 +51,8 @@ M1:
 - [x] Memory: ≈ 622 KB core A SRAM in use, ≈ 180 KB core B; the "whole image in RAM" model and the 16 KB free block were disproved on device by H0/H0a
 - [x] Arm GNU Toolchain 13.3.Rel1 installed and verified (see docs/HARDWARE.md)
 - [x] **Custom code runs (H1, 2026-11-07).** Hook loaded by stock's ModuleOverlay via empty module slot 2 into free RAM 0x0309F800, called from module 12's INQUIRY send: internal disk enumerates as "SCHALAOS ZEAL HOOK". (H0/H0a in the bare file gap failed: never loaded, address past the 640 KB RAM end.)
-- [ ] On-device measurements (diagnostic build): CPU clock, full-frame blit time, raw ADC for button pairs, play-path timing
+- [x] D1 diagnostics (build 13): CPU clock 200 MHz (USB mode); all 8 ladder buttons measured; **simultaneous face-button presses impossible** (series ladder, lowest wins)
+- [ ] D2 measurements: full-frame blit time, music-mode clock, play-path timing
 - [ ] Power / battery / charging (read-only)
 - [ ] docs/HARDWARE.md
 
@@ -60,7 +62,7 @@ M1:
 - Module 0 = resident core: 0x2E300 bytes from code.bin 0x2988C, runs at 0x03050000; data runs at 0x03004000.
 - Module 12 = USB mass storage: code runs at 0x03083610 (code.bin 0x813E8), INQUIRY blocks at 0x03036790 (internal) / 0x030367B4 (SD).
 
-Device currently runs H1 (stock V1.7.8 + slot-2 INQUIRY hook), stamp build 12. Next update must stamp build 13 or later.
+Device currently runs D1 (stock V1.7.8 + slot-2 diagnostic INQUIRY hook), stamp build 13. Next update must stamp build 14 or later. Read D1 with `python tools/inquiry.py D`.
 
 ## Decisions
 
