@@ -52,7 +52,9 @@ M1:
 - [x] Arm GNU Toolchain 13.3.Rel1 installed and verified (see docs/HARDWARE.md)
 - [x] **Custom code runs (H1, 2026-11-07).** Hook loaded by stock's ModuleOverlay via empty module slot 2 into free RAM 0x0309F800, called from module 12's INQUIRY send: internal disk enumerates as "SCHALAOS ZEAL HOOK". (H0/H0a in the bare file gap failed: never loaded, address past the 640 KB RAM end.)
 - [x] D1 diagnostics (build 13): CPU clock 200 MHz (USB mode); all 8 ladder buttons measured; **simultaneous face-button presses impossible** (series ladder, lowest wins)
-- [ ] D2 measurements: full-frame blit time, music-mode clock, play-path timing
+- [ ] Play-path timing (next: owner's slow-motion video, then timestamp hooks)
+- [ ] Music-mode clock
+- Screen push time: **deferred to M2** (decided 2026-11-07), measured with SchalaOS's own display driver. Stock's real flush path is indirect; the module-0 blits 0x03064F70/0x03064FD4 have no callers and do not set the panel window
 - [ ] Power / battery / charging (read-only)
 - [ ] docs/HARDWARE.md
 

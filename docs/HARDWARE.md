@@ -116,7 +116,7 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 - Stock "clear screen" (0x03064F2A) writes all 71,040 pixels one at a time through the CPU. Wasteful; SchalaOS should fill by DMA.
 - The panel driver is **chosen at boot from a table in flash** (`LcdDriverIndex`, LcdInterface.c, module 1 0x03081CC0): its function table is copied to 0x0306FD14 and `ops[1]` (init) is called. The panel's command sequence lives in that flash table, not in the code modules. Controller model not yet identified.
 - 0x60070000 (SDK "VOP") is used as per-channel registers (channel × 0x34), more like a DMA engine than display timing.
-- **Open:** bus speed and full-frame push time. Measure on device (time a full 296×240 DMA blit).
+- **Open (deferred to M2):** bus speed and full-frame push time. Stock's blit routines 0x03064F70 / 0x03064FD4 have no direct callers or stored pointers anywhere in the image, and their window routine 0x03064EA8 only updates software state (no panel command), so the live flush goes through an untraced indirect path (likely the panel-driver table from flash). DMA: DesignWare-style DMAC at 0x60000000 (ChEnReg +0x3A0, channels 0–4, allocator 0x030614F8), linked-list start 0x03061524 with up to 18 blocks of 0xFF8 words, descriptors at 0x03005AD4 + ch×0x1B0. SysTick is unused on core A (only cleared, at 0x030563F8), so a hook can use it as a 24-bit cycle counter.
 
 ## Memory
 
