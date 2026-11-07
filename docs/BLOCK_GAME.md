@@ -120,6 +120,21 @@ Behaviour details chosen while building (change if they feel wrong):
 - Result screen: A or Start = retry, B = quit. Pause: Up/Down + A, Start resumes.
 - Best time is kept across retries in RAM only.
 
+## Background music (owner, 2026-11-07)
+
+Play a track from storage on loop while the game runs, using stock's music engine (it stays
+resident above the game's code window, so no decoder of our own).
+
+- On game start: if music is already playing, leave it. Otherwise play the first audio file in
+  `/_blockgame/` (SD card first, then internal storage) with repeat-one. Any stock format works.
+- On quit: stop that track (music the user started keeps playing).
+- The file is never part of the firmware image.
+- Steps: (1) no-code check: start a track on repeat, open stock's block game, listen for dropouts;
+  (2) trace how the browser hands a file to the music module (33) and where repeat mode lives;
+  (3) call that from the game's init, stop it in deinit.
+- Watch: stock's library scan will probably index `_blockgame` (try the FAT hidden attribute);
+  stock's ~3 s play start means music begins a couple of seconds after GO until v0.3.
+
 ## Engineering plan
 
 1. **Test module:** replace module 82 with a minimal C window (fills screen, prints text, reacts to
