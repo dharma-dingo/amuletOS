@@ -160,7 +160,7 @@ been on an August build).
 | 14 | …14 | D1 + boot/goodbye art | passed ("v0.1" clipped) |
 | 15 | …15 | D1 + full v0.1 reskin | art-book "beautiful", menu order wrong |
 | 16 | …16 | build 15 + menu mapping fix + no subtitles | passed (owner: menu panels and text OK) |
-| 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | copied to device (hash verified), owner restarts to install |
+| 17 | …17 | build 16 + font style D (`--font bold1x`): ASCII glyphs in both stock fonts replaced | installed; font replaced everywhere but **too small to read** (owner): needs a bigger font |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX
@@ -287,8 +287,8 @@ been on an August build).
 - v0.2 Now Playing (owner, 2026-11-07): v0.1 left stock's run-time text (font and positions) on
   Now Playing, so it doesn't match the mockup. Replace module 27 with our own window drawn like the
   mockup ("AP30 Screen Mockups", Now Playing): status bar, art panel, artist and album in
-  the compact 6 px font (owner: show only artist, album, song title, art and play time; no genre,
-  file name, disc or format), double-size scrolling track title, progress bar with lavender playhead,
+  the compact 6 px font (owner, revised: text = artist + song title only, much bigger; album art stands in for the
+  album; play time; no genre, file name, disc or format), double-size scrolling track title, progress bar with lavender playhead,
   elapsed/remaining. Needs stock's playback state (tags, position, length, cover) and its transport
   calls; trace them from module 27. Reuses Blockz's module build tooling and renderer
   approach (own RGB565 drawing, dirty rects). Fallback: patch ASCII glyphs in stock's font section.
