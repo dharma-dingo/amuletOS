@@ -2,7 +2,7 @@
 
 State of the project at the end of 2026-11-07. Read this first, then `README.md` (status
 checklist, release plan, decisions), `docs/HARDWARE.md` (every technical finding),
-`docs/BLOCK_GAME.md` (v0.2 game spec) and the Notion product spec.
+`docs/BLOCKZ.md` (v0.2 game spec) and the Notion product spec.
 
 ---
 
@@ -161,12 +161,12 @@ been on an August build).
 | 15 | …15 | D1 + full v0.1 reskin | art-book "beautiful", menu order wrong |
 | 16 | …16 | build 15 + menu mapping fix + no subtitles | copied to device; owner to confirm |
 
-### v0.2 planning (block game)
+### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX
   (Game Boy Color) look, original name/code/art. **Sprint 40 lines first.**
 - Research: Apotris' source is no longer public; its wiki gives modes, DAS/ARR presets, 1–5
   previews, skins. The SRS guideline (tetris.wiki) gives exact kick tables, 7-bag, hold, 0.5 s
-  lock delay with 15 move resets. All captured in `docs/BLOCK_GAME.md`.
+  lock delay with 15 move resets. All captured in `docs/BLOCKZ.md`.
 - Owner's picks: **1 next preview; no line-clear or entry delay ("fluid and fast"); Up = hard
   drop; A = rotate clockwise, B = counter-clockwise; wheel up = hold; Select quits to menu (as in
   stock games); Start = pause**. Handling defaults: DAS Fast (9f), ARR Fast (1f), soft drop
@@ -183,10 +183,10 @@ been on an August build).
   before pushing).
 - **v0.2 game core (2026-11-07, later session):** §6.3 step 3 done on the PC: `game/core.c`,
   `game/render.c`, tests (87 checks), bot preview and a playable browser build. See
-  `docs/BLOCK_GAME.md` "Status". Next: owner plays `build/game_preview/play.html`
+  `docs/BLOCKZ.md` "Status". Next: owner plays `build/game_preview/play.html`
   (`python game/build.py web`), then §6.3 step 1 (minimal device test module) and step 2.
 - **Notion:** spec updated with Gate 1, M1 findings (corrected memory model, buttons, 200 MHz),
-  release plan (v0.1 reskin, v0.2 own UI and block game, v0.3 speed), block game requirement.
+  release plan (v0.1 reskin, v0.2 own UI and Blockz, v0.3 speed), Blockz requirement.
 - **Memory (assistant):** project, owner preferences and feedback files are up to date.
 
 ---
@@ -196,8 +196,8 @@ been on an August build).
 - Hybrid approach: keep stock's audio engine (decoders on core B, DAC tuning), replace the UI,
   navigation, library and play-start path over time.
 - Release plan: **v0.1** Zeal reskin of stock · **v0.2** own UI (ES-DE-style carousel, Start
-  opens Settings, compact font, metadata browsing) + own block game (Games tile becomes
-  **"Block Game"** and launches it directly; other stock games dropped) · **v0.3** speed (play
+  opens Settings, compact font, metadata browsing) + Blockz (Games tile becomes
+  **"Blockz"** and launches it directly; other stock games dropped) · **v0.3** speed (play
   start, boot to music, screen timing) · M5 Game Boy emulation (note: direction + A/B is
   impossible on the face buttons; would need the wheel/GPIO key).
 - Look: Zeal Sky default, lavender accents, diamond pattern, arrow cursor, bevelled blocks, 2×
@@ -228,7 +228,7 @@ been on an August build).
    any stock beige text remains.
 4. For a clean v0.1 without diagnostics, build from `build/stock` instead of `build/d1`.
 
-### 6.2 v0.2 block game: architecture
+### 6.2 v0.2 Blockz: architecture
 - **Replace module 82's table entry** (code.bin offset 8 + 32×82). Stock's menu loads module 82
   through ModuleOverlay when the game is chosen, so our module runs in its place and stock's music
   keeps playing.
@@ -254,7 +254,7 @@ been on an August build).
   data, writes them into the gap, rewrites module 82's eight table words, then packs with
   `build_reskin.py`-style art (base `build/v01`) and verifies.
 
-### 6.3 v0.2 block game: sequence
+### 6.3 v0.2 Blockz: sequence
 1. **Minimal device test module** following the contract above: draws a screen, reacts to keys,
    quits on Select. Expected failure mode if wrong: only launching the game crashes or hangs; the
    menu, music and copy-updates keep working. If the device hangs on launch, restart; if it
@@ -278,7 +278,7 @@ been on an August build).
 6. **Look:** 11 px cells, well 110×220 centred, NEXT (1 preview) and HOLD panels, timer, lines
    left, PPS; bevelled guideline-coloured blocks tuned to the palette; ghost outline; plain labels.
    Reuse `art/zeal.py` colours; render a mock frame on PC for owner review first.
-7. **Main menu:** relabel the Games panel "Block Game" and make the tile launch module 82 directly
+7. **Main menu:** relabel the Games panel "Blockz" and make the tile launch module 82 directly
    (patch the main menu's Games action, module 21); drop the other game modules later to free
    flash.
 
@@ -288,9 +288,9 @@ been on an August build).
   mockup ("AP30 Screen Mockups", Now Playing): status bar, art panel, title/artist/disc/format in
   the compact 6 px font, double-size scrolling track title, progress bar with lavender playhead,
   elapsed/remaining. Needs stock's playback state (tags, position, length, cover) and its transport
-  calls; trace them from module 27. Reuses the block game's module build tooling and renderer
+  calls; trace them from module 27. Reuses Blockz's module build tooling and renderer
   approach (own RGB565 drawing, dirty rects). Fallback: patch ASCII glyphs in stock's font section.
-- v0.2 carousel (owner, 2026-11-07): one level, items Now Playing, Music, Block Game, Library;
+- v0.2 carousel (owner, 2026-11-07): one level, items Now Playing, Music, Blockz, Library;
   Start opens Settings; Bluetooth and Folders go under Settings later. Stock's Music and Library
   screens are opened directly until ours replace them (trace their launch calls in module 21).
 - v0.2 own UI: an ES-DE-style carousel (true one-direction movement, Start opens Settings),

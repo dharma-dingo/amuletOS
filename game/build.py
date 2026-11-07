@@ -1,4 +1,4 @@
-"""Build the block game on the PC with zig's clang (pip install ziglang).
+"""Build Blockz on the PC with zig's clang (pip install ziglang).
 
   python game/build.py test      unit tests
   python game/build.py preview   bot replay -> build/game_preview/*.png + replay.gif

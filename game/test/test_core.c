@@ -1,4 +1,4 @@
-/* Unit tests for the block game core and renderer (PC). Build: game/build.py test */
+/* Unit tests for Blockz core and renderer (PC). Build: game/build.py test */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

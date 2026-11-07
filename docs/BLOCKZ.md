@@ -1,6 +1,6 @@
-# Block Game (v0.2) spec
+# Blockz (v0.2) spec
 
-Our own falling-block game replacing stock's block game (module 82). Gameplay feel inspired by
+Blockz: our own falling-block game, replacing stock's block game (module 82). Gameplay feel inspired by
 Apotris, look inspired by Game Boy Color era menus (Tetris DX), in the SchalaOS palette.
 Original name, code and art; no third-party code (Apotris source is not public, so we design
 from its published mechanics and the public SRS guideline). First release: **Sprint 40 lines only.**
@@ -145,4 +145,4 @@ resident above the game's code window, so no decoder of our own).
 3. **Device shell:** window callbacks call the core once per frame; draw only changed cells
    (stock's fill is per-pixel); find the screen flush path for a steady 60 fps.
 4. **Wheel input** for hold (read the encoder ourselves while the game runs, so it doesn't
-   change volume), then the main menu's Games tile launches the game directly ("Block Game").
+   change volume), then the main menu's Games tile launches the game directly ("Blockz").

@@ -97,7 +97,7 @@ Start and A sit at stock's band edges; SchalaOS should use midpoints between mea
 
 **Simultaneous face-button presses cannot be read (confirmed).** Every pair reads as its lower-value member: Up+A → Up, Right+A → Right, Left+Select → Left, Up+Right → Right, Down+Start → Down, Select+Start → Select. Series ladder: priority Right > Up > Left > Down > Select > Start > B > A, so A is masked by any other face button. Inputs that can combine with a face button: the volume wheel (GPIO encoder) and the GPIO2 pin 5 key.
 
-**Consequences.** Hardware limit, confirmed on device: one face button at a time. Block game: rotate on the wheel (or the GPIO key) so move + rotate works. Game Boy: direction + A/B is impossible on the face buttons; A/B would have to move to the wheel / GPIO key.
+**Consequences.** Hardware limit, confirmed on device: one face button at a time. Blockz: rotate on the wheel (or the GPIO key) so move + rotate works. Game Boy: direction + A/B is impossible on the face buttons; A/B would have to move to the wheel / GPIO key.
 Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then every 2 ticks.
 
 **Volume wheel = quadrature encoder on GPIO2 pins 0 (A) and 9 (B)**, polled from the system timer: 0x030534AC configures the pins as inputs and compares A/B with the previous sample (0x0306FBCC / 0x03004144), counting steps per direction at 0x030226E5 / 0x030226E4 (total 0x030226E8). Responsiveness depends on the poll rate.
@@ -172,9 +172,9 @@ out text wider than its current advances (clipping or scrolling).
 - 0x0307E300 is a FAT sector cache (512 B buffer, +0x200 dirty flag, +0x204 cached sector), so module 0 cannot grow past 0x0307E300.
 - **Empty slot 2 is loaded with type 7 in 21 places**, notably module 10's USB start (0x03081670 ModuleOverlay(12), 0x03081678 ModuleOverlay(2), then the handler). Pointing slot 2 at bytes in the file gap with run address 0x0309F800 makes stock load our code itself (`build_hook.py h1`). Empty slot 43 is loaded once (module 33).
 
-## UI window / game module interface (for the v0.2 block game)
+## UI window / game module interface (for the v0.2 Blockz)
 
-- Every UI screen and game is an overlay module whose **data section starts with a window descriptor**: `{0, 0, tick, service, paint, init, deinit}` (seen in modules 5, 6, 9, 17, 21 main menu, 27 Now Playing, 30, 32 settings, 81–111 games). Module 82 = stock block game ("LOCK PAUSE Level NEXT Score STOP Run"), module 81 = Snake. Module 82: code 0x1080 B at run 0x030815C4, data 0x3E8 B at 0x03023B48, ZI 0x320 B at 0x03023F30; state struct at 0x03023F34.
+- Every UI screen and game is an overlay module whose **data section starts with a window descriptor**: `{0, 0, tick, service, paint, init, deinit}` (seen in modules 5, 6, 9, 17, 21 main menu, 27 Now Playing, 30, 32 settings, 81–111 games). Module 82 = stock Blockz ("LOCK PAUSE Level NEXT Score STOP Run"), module 81 = Snake. Module 82: code 0x1080 B at run 0x030815C4, data 0x3E8 B at 0x03023B48, ZI 0x320 B at 0x03023F30; state struct at 0x03023F34.
 - Module 82 callbacks: tick 0x030824DE (increments state+0x14), service 0x0308249C (running → 0x03081FDA, paused/over → 0x030822BA), paint 0x030824EA, init 0x030824A8, deinit 0x030824D0.
 - **Input:** `GetKey()` = 0x03062FA6 returns an event word: type in the top byte (0x40…, 0x20…, 0x41/0x42…), ladder key code in the low bits (0x001 GPIO key, 0x002 Select, 0x004 Right, 0x008 Left, 0x010 Up, 0x020 Down, 0x040 B, 0x080 A, 0x100 Start). Exact type meanings (press / repeat / release / long) still to confirm.
 - **Messages:** bitset at 0x03023280; post = 0x03067ED4(id), test-and-clear = 0x03067EF0(id). Paint checks message ids such as 0x18C / 0x186 to decide what to redraw.

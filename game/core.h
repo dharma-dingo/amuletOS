@@ -1,6 +1,6 @@
-/* SchalaOS block game core: portable, freestanding C (no libc), deterministic.
+/* SchalaOS Blockz core: portable, freestanding C (no libc), deterministic.
  * Driven by one input bitmask per frame (60 fps). Used by the device module,
- * the unit tests and the PC preview. Spec: docs/BLOCK_GAME.md. */
+ * the unit tests and the PC preview. Spec: docs/BLOCKZ.md. */
 #ifndef BG_CORE_H
 #define BG_CORE_H
 #include <stdint.h>
