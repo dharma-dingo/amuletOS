@@ -14,7 +14,9 @@ from icons import SETS, LABELS, N
 
 # library/menu screens use Zeal's palace blue-green variant (from the mockups)
 T = dict(THEMES["zeal"], bg1="#c2e8de", bg2="#a4d8cc", border="#1d4f74", dim="#5a8a94", shade="#dcefe9")
-STATES = [14, 16, 18, 20, 22, 24]          # image index for tile 0..5 selected
+# image index drawn when tile 0..5 is selected (measured from stock's highlights:
+# 016 top-left, 014 top-middle, 018 top-right, 022 bottom-left, 020 bottom-middle, 024 bottom-right)
+STATES = [16, 14, 18, 22, 20, 24]
 COLS = [(0, 49), (49, 99), (99, 148)]      # 148-grid tile spans (x0, x1)
 ROWS = [(17, 68), (68, 120)]
 ARROW = [16, 24, 28, 30, 28, 24, 16]
