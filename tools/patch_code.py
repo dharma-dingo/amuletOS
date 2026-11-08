@@ -51,6 +51,11 @@ def thumb_bl(src, dst):
     j1 = (~i1 ^ s) & 1; j2 = (~i2 ^ s) & 1
     return struct.pack("<HH", 0xF000 | (s << 10) | imm10, 0xD000 | (j1 << 13) | (j2 << 11) | imm11)
 
+def thumb_bw(src, dst):
+    """B.W (T4): same layout as BL with bit 14 of the second halfword clear"""
+    hi, lo = struct.unpack("<HH", thumb_bl(src, dst))
+    return struct.pack("<HH", hi, lo & ~0x4000)
+
 def thumb_b16(src, dst):
     off = dst - (src + 4)
     assert -2048 <= off < 2048 and not off & 1
@@ -122,7 +127,38 @@ def lib_skip():
         (1, 0x030827EA, "eaf789fe", thumb_bl(0x030827EA, h["cfg_boot_write"]).hex()),  # boot config rewrite
     ]
 
-GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "lib_skip": lib_skip}
+def np_v4():
+    """v0.3 Now Playing layout A (game/device/npui.c in slot 28, loaded by np_load in slot 2): artist (2 lines) and
+    album (3 lines) in the right panel, double-size scrolling title, m:ss / -m:ss times, n/total counter, own
+    progress bar. Use instead of np_v2/np_v3 (needs helpers.json and npui.json in SRC_DIR)."""
+    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    u = json.load(open(os.path.join(SRC_DIR, "npui.json")))
+    nop = bytes.fromhex("00bf")
+    def region(at, end, fn, back):          # bl fn; b.w back; NOP to the end of the replaced region
+        code = thumb_bl(at, u[fn]) + thumb_bw(at + 4, back)
+        return (code + nop * ((end - at - len(code)) // 2)).hex()
+    return [
+        (27, 0x03081654, "e6f746bf", thumb_bw(0x03081654, h["np_load"]).hex()),           # init tail: load slot 28
+        (27, 0x03082A2A, "e1f7a4fa", thumb_bl(0x03082A2A, u["np_artist"]).hex()),         # info box line 1: artist
+        (27, 0x03082A2E, "0020", thumb_b16(0x03082A2E, 0x03082A7C).hex()),                 # skip line 2 code
+        (27, 0x03082A90, "b1f85a13", "b1f85c12"),                                          # line 3 source: album
+        (27, 0x03082AC6, "e1f756fa", thumb_bl(0x03082AC6, u["np_album"]).hex()),          # line 3 draw: album
+        (27, 0x03082AE0, "e1f7defc", thumb_bl(0x03082AE0, u["np_clear_artist"]).hex()),   # line 1 empty: clear
+        (27, 0x03082B04, "e1f7ccfc", NOP2),                                                # line 3 empty fallback
+        (27, 0x0308344C, "adf80840adf80c90adf80a50adf80e60ac2200211c20e1f75dfc02a9a8f800400223384a0846e0f780fd3fe0",
+         region(0x0308344C, 0x03083478, "np_title_new", 0x030834F8)),                     # title line, mode 1
+        (27, 0x03083478, "adf80840adf80c90adf80a50adf80e6008a91c20e1f71ff9ac2200211c20e1f743fc2e48e0f759fcbdf8201088421ad9bdf80890294d4ff01e0c69f30f01bdf80a90cde9005c352664f30f0202a869f31f416bf31f4266f30f03e0f7d8fe4420e4f7fcfc02e04420e4f719fd02a9a8f800400223194a0846e0f741fd",
+         region(0x03083478, 0x030834F4, "np_title_new", 0x030834F4)), # title line, mode 0
+        (27, 0x0308350E, "e0f76dfe", thumb_bl(0x0308350E, u["np_title_step"]).hex()),     # scroller step
+        (27, 0x03083114, "fff7f9fc", thumb_bl(0x03083114, u["np_time"]).hex()),           # position
+        (27, 0x0308341E, "fff774fb", thumb_bl(0x0308341E, u["np_time"]).hex()),           # length
+        (27, 0x0308316A, "e1f7d9fd", NOP2),                                                # counter clear image 0x38
+        (27, 0x0308317A, "fff74efa", thumb_bl(0x0308317A, u["np_count"]).hex()),          # n/total
+        (27, 0x03083208, "daf8440001283068",
+         (thumb_bl(0x03083208, u["np_progress"]) + thumb_bw(0x0308320C, 0x030833DA)).hex()),  # progress bar
+    ]
+
+GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)

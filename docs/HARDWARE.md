@@ -260,6 +260,38 @@ out text wider than its current advances (clipping or scrolling).
   Misses: a file rewritten in place (same clusters) below the top level, e.g. a tag edit with padding. Manual
   rebuild: Folders, pick the other disk, Yes, then back to the SD card, Yes.
 
+## Now Playing internals for layout A (traced 2026-11-07, build 28)
+
+- **Play state:** `P = *(u32 **)0x030483D0`: P[0] = length ms, P[1] = position ms (+8/+0xC format values). Position
+  also from 0x0308EA16(&ms). Message 0x39 = second tick (paint draws the position via 0x03057774(sec, &h, &m, &s)
+  and 0x03082B0A(h, m, s, 0)), 0x3A = length known (0x03082B0A(..., 1)); 0x03082B0A builds "hh:mm:ss" and draws it
+  with 0x03063E38 at (23, 203) / (223, 203) after clear image 0x21. 0x46 = progress: x = pos * 247 / len from 23,
+  playhead images 0x124/0x125, columns from images 0x62/0x63 (info loaded in init into 0x03023BB8/88/A0).
+- **Track counter:** 0x0308261A(n, total) draws "nnnn/tttt" with 0x03063E38 at (40, 10), after clear image 0x38.
+- **Title line** (y 172..187, both modes): msg 0x43 (new title) clears image 0x1C, measures with 0x03063D52, if wider
+  than 296 registers stock's text scroller 0x03064286(rect, ..., speed 0x1E) and posts 0x44; every paint while 0x44:
+  0x030641EC(str) steps it. Mode 1 ([0x03023B6C] == 1) draws the lyric line (0x030248FC) on msg 0x49.
+- **Status icons:** play state 0x1F/0x20 at (143, 6), 0x2D+n / 0x109+n at (183, 7), repeat 0x22..0x27 at (105, 10),
+  battery 0x11E + *(u16 *)0x03022E94 at (209, 11). Background = image 0x1A (026) via 0x0306492A.
+- **Cover:** module 18 decodes it straight into the framebuffer; m27 0x03082BFC sets width/height 0x74 (116) at
+  0x03025160/0x0302515C and x 0x11 / y 0x2E at 0x03025164/0x03025168 (so 116x116 at (17, 46)); no cover: image
+  0x115 (277) at (17, 46). Msg 0x115 = decode in progress (0x03054608 holds the screen flush meanwhile).
+- **Drawing API:** framebuffer 0x03006688 (stride 592; 190 rows + 50 rows at 0x0306FD50; page 0x03022E48).
+  FillRect 0x03064688(x0, y0, x1, y1) inclusive in colour *(u16 *)0x03022DEC = Window 0x03064EA8(x0, y0, x1, y1)
+  then Pixel 0x03064DC4(colour) per pixel, row-major (we stream glyph bitmaps the same way). Font select
+  0x030643A2(n): 1 = 12 px font0 (base *0x03022858), 2 = 16 px font1 (base *0x0302285C), current base at
+  0x03022868; char width 0x03063BC6(ch) (adv byte > 0x80 -> byte - 0x80, else 6 / 8, CJK 12 / 16) plus letter
+  spacing *(s16 *)0x03022E04; font1 glyph = 16 big-endian u16 rows at base + ch * 33, read with 0x0306535C(off,
+  buf, n). Text 0x03063E38(x, y, str16), clipped text 0x03063F76(rect, rect, str16, mode).
+- **Free code RAM while Now Playing runs:** 0x03083F0C (m27 end) .. 0x03084664 (module 18); modules 9 (FunUSB) and
+  12 (USB storage) also use it but only in USB mode. Build 28 puts `game/device/npui.c` there as slot 28
+  (`tools/build_overlay.py`), loaded by `np_load` (slot 2) at the end of m27's init. Title scroll state at RAM
+  0x0309FFD8 (above slot 2, after libscan's 0x0309FFC0).
+- Build 28 hooks (`np_v4`): init tail 0x03081654; info box 0x03082A2A / 0x03082A2E / 0x03082A90 / 0x03082AC6 /
+  0x03082AE0 / 0x03082B04; title regions 0x0308344C (mode 1) and 0x03083478 (mode 0) -> np_title_new; scroller step
+  0x0308350E -> np_title_step; times 0x03083114 / 0x0308341E -> np_time; counter 0x0308316A (clear) / 0x0308317A;
+  progress 0x03083208 -> np_progress then on at 0x030833DA. Mode 1 now shows the title instead of lyrics.
+
 ## Stock Now Playing (module 27), traced 2026-11-07
 
 - Window descriptor: tick 0x030823BE, service 0x03083688, paint 0x030835EC, init 0x030815C4, deinit 0x03081658.

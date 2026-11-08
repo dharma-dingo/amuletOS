@@ -87,3 +87,11 @@ void np_clear_artist(void)
     CLEAR(STRIP, 0xA8, 91 - LIFT);
     CLEAR(STRIP, 0xA8, 91 - LIFT + LINE_GAP);
 }
+
+/* v0.3 Now Playing: module 27's init ends with "ModuleOverlay(18, 7)" (cover decoder); patched to come here
+ * so the layout A drawing code (game/device/npui.c, module slot 28 at 0x03083F0C) is loaded first. */
+uint32_t np_load(void)
+{
+    ((uint32_t (*)(uint32_t, uint32_t))(0x030684E4u | 1))(28, 7);
+    return ((uint32_t (*)(uint32_t, uint32_t))(0x030684E4u | 1))(18, 7);
+}

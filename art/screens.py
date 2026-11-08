@@ -102,14 +102,7 @@ def now_playing(t=T_SKY):
     # info panel runs off the right edge: stock clears each text line with a 128 px strip (image 069)
     # from x=168 to the screen edge, so the panel interior must reach the edge to hide it
     panel(cv, 73, 18, 80, 68, t, False)
-    for gy, kind in ((22, "artist"), (43, "album")):   # artist text at y 49, album at y 91 (2 lines each)
-        ic = small_icon(kind)
-        c, m = ic.outlined(t["text"])
-        # draw icon at half size: sample every 2nd pixel (12x12 on the grid)
-        for yy in range(0, N, 2):
-            for xx in range(0, N, 2):
-                if m[yy, xx]:
-                    cv.rect(75 + xx // 2, gy + yy // 2, 1, 1, tuple(int(v) for v in c[yy, xx]))
+    # v0.3 layout A: artist and album text only (game/device/npui.c draws them), no icons
     # title / progress / time band, full width: the scrolling title line clears a 296 px strip (image 028)
     panel(cv, -4, 84, 156, 34, t, False)
     return cv
