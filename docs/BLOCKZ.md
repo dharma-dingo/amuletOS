@@ -78,10 +78,9 @@ Directional delay (DAS resets on direction change): on. Initial hold/rotate (IHS
 | Down | soft drop |
 | Up | hard drop (with drop protection: ignore a second hard drop within a few frames) |
 | A / B | rotate clockwise / counter-clockwise |
-| Wheel up | hold (owner) |
-| Wheel down | unassigned for now |
-| Select | quit to menu (same as stock games) |
-| Start | pause menu (Resume, Retry, Quit) |
+| Select | hold (owner, 2026-11-07: the wheel stays volume) |
+| Wheel | volume, as everywhere else; "VOL nn" shows in the MUSIC panel for 1.5 s and on the pause panel |
+| Start | pause menu (Resume, Retry, Quit); Quit (or B on the finish screen) is the only way out |
 
 ## Look
 

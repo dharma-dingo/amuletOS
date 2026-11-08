@@ -49,6 +49,8 @@ static struct {
     uint32_t adc_since;
     uint8_t info, info_drawn;    /* read-only INFO page (pause, then Left) */
     uint8_t bgm_pending, painted, bgm_shown;
+    uint32_t vol_until;          /* MUSIC panel shows the volume until this time */
+    char music_txt[10];          /* what the MUSIC panel value shows now */
     uint32_t seed;
 } S;
 
@@ -176,31 +178,30 @@ static int32_t service(void)
     for (int n = 0; n < 8; n++) {
         uint32_t ev = GetKey();
         if (!ev) break;
-        if ((ev >> 24) != EV_PRESS && !((ev & 0x1FF) == K_SELECT && (ev >> 24) == 0x20)) continue;
+        if ((ev >> 24) != EV_PRESS) continue;
         if (S.info) {                                /* INFO page: any of these closes it */
             uint32_t k = ev & 0x1FF;
             if (k == K_LEFT || k == K_B || k == K_START || k == K_A) { S.info = 0; CACHE.valid = 0; S.dirty = 1; }
-            if (k == K_SELECT) { quit(); return -1; }
             continue;
         }
         if ((ev & 0x1FF) == K_LEFT && G.state == ST_PAUSE) { S.info = 1; S.info_drawn = 0; S.dirty = 1; continue; }
         switch (ev & 0x1FF) {
-        case K_SELECT: quit(); return -1;
+        case K_SELECT: S.pulses |= IN_HOLD; break;  /* owner: Select = hold; exit via Start > QUIT */
         case K_A:      S.pulses |= IN_CW; break;
         case K_B:      S.pulses |= IN_CCW; break;
         case K_UP:     S.pulses |= IN_UP; break;
         case K_START:  S.pulses |= IN_START; break;
-        case K_WHEEL_A:
-        case K_WHEEL_B:
-            if (G.state == ST_PAUSE) {               /* paused: the wheel sets the volume */
-                int v = VOLUME + ((ev & 0x1FF) == K_WHEEL_A ? 1 : -1);
-                if (v < 0) v = 0;
-                if (v > 100) v = 100;
-                VOLUME = (uint8_t)v;
-                if (ThreadRunning(m_rd32(PHAND), PDESC) == 1) AudioControl(0xF8, 0);
-                S.dirty = 1;
-            } else S.pulses |= IN_HOLD;              /* playing: hold (either direction until confirmed) */
+        case K_WHEEL_A:                              /* wheel = volume, as everywhere else on the device */
+        case K_WHEEL_B: {
+            int v = VOLUME + ((ev & 0x1FF) == K_WHEEL_A ? 1 : -1);   /* direction to confirm on device */
+            if (v < 0) v = 0;
+            if (v > 100) v = 100;
+            VOLUME = (uint8_t)v;
+            if (ThreadRunning(m_rd32(PHAND), PDESC) == 1) AudioControl(0xF8, 0);
+            S.vol_until = now_us() + 1500000u;       /* show VOL nn in the MUSIC panel for 1.5 s */
+            S.dirty = 1;
             break;
+        }
         }
     }
 
@@ -227,6 +228,7 @@ static int32_t service(void)
         S.dirty = 1;
         if (ev & EV_QUIT) { quit(); return -1; }
     }
+    if (S.vol_until && (int32_t)(S.vol_until - t) > -100000) S.dirty = 1;   /* let VOL nn time out */
     if (S.dirty) SendMsg(MSG_DRAW);
     return 0;
 }
@@ -303,12 +305,17 @@ static void paint(void)
         if (full) {                                  /* MUSIC panel, bottom left (free space) */
             panel(LX, 172, PW, 40, C_BORDER, C_PANEL);
             text_c(LX, PW, 176, "MUSIC", C_DIM);
-            S.bgm_shown = 0xFF;
+            S.music_txt[0] = 1;                      /* force a redraw of the value */
         }
-        if (S.bgm_shown != M.status) {
-            S.bgm_shown = M.status;
+        char mt[10];
+        if ((int32_t)(S.vol_until - now_us()) > 0) {
+            mt[0] = 'V'; mt[1] = 'O'; mt[2] = 'L'; mt[3] = ' ';
+            put_u(mt + 4, VOLUME, 1);
+        } else scpy(mt, M.status == BGM_OFF && S.bgm_pending ? "..." : bgm_label());
+        if (!streq(mt, S.music_txt)) {
+            scpy(S.music_txt, mt);
             fill(LX + 2, 194, PW - 4, 14, C_PANEL);
-            text_c(LX, PW, 194, M.status == BGM_OFF && S.bgm_pending ? "..." : bgm_label(), C_TEXT);
+            text_c(LX, PW, 194, mt, C_TEXT);
         }
         S.painted = 1;
         S.dirty = 0;
