@@ -168,6 +168,17 @@ player moved to an unrelated song (next card-wide index), and is a likely cause 
 Only AudioStart writes +0x34 by literal (root cluster when 0); the index -> (cluster, number) step writes through
 a struct pointer and is still to be found, along with the player command that reopens the requested file.
 
+**Build 25 attempt (`game/device/bgmusic.c`):** on the first frame: player running -> MUSIC "ON" (left alone).
+Else: SD present (sys +0x1F), switch to disk 4, root cluster from 0x0307E71C+0x0D, iterate the root with
+FindFirst/FindNext (type 6, audio filter 0x030056EB; exFAT root info seeded like the browser: cluster, flag +0x0C),
+match the folder's long name "_blockgame" (exFAT 0x0305B2D0 / FAT 0x0305C364), take its cluster (exFAT: iterator
+info +0; FAT: entry +0x14/+0x1A) and file count; 0x03055304() then record +0xF2 = 0x63, +0x34 = cluster,
++0x38 = random file; ThreadDelete/ModuleLoad(33)/ThreadCreate(arg {1, 0x46}). While open: if the record's
+cluster/file change (track ended), AudioClose (0x0308D86E(1)), point the record at a new random file, AudioControl(0xE5).
+Exit: ThreadDelete. Status in the MUSIC panel: ON, PLAY, NO SD, NO DIR, EMPTY, ERR 1 (find failed), ERR 2 (player
+did not start or stopped). INFO page lines BG (FS type, root, cluster from entry) and BX (cluster from exFAT info,
+file count, current file) - expected cluster on the owner's card: 000A0C32.
+
 Earlier plan (superseded by the behaviour above):
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays

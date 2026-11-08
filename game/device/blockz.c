@@ -15,6 +15,7 @@
 #define BG_FILL_EXTERN
 #include "../core.c"
 #include "../render.c"
+#include "bgmusic.c"
 
 #define MSG_CLEAR  0x18C
 #define MSG_DRAW   0x186
@@ -44,6 +45,7 @@ static struct {
     uint8_t adc_state, adc_cand; /* debounced ladder state and the candidate being timed */
     uint32_t adc_since;
     uint8_t info, info_drawn;    /* read-only INFO page (pause, then Left) */
+    uint8_t bgm_pending, painted, bgm_shown;
     uint32_t seed;
 } S;
 
@@ -123,6 +125,7 @@ static uint8_t held_from_adc(void)
 static void quit(void)
 {
     uint16_t tile = 1;               /* main menu focus: BLOCKZ tile */
+    bgm_stop();
     GameLeaveB();
     TaskSwitch(0, &tile);
     COLOR = 0;
@@ -143,6 +146,8 @@ static void init(void)
     G.best = best;
     S.last_us = now_us();
     S.wa = WHEEL_A; S.wb = WHEEL_B;
+    S.bgm_pending = 1;               /* music check after the first frame is on screen */
+    S.bgm_shown = 0xFF;
     SendMsg(MSG_CLEAR);
     GameEnterA();
     GameEnterB();
@@ -150,6 +155,7 @@ static void init(void)
 
 static void deinit(void)
 {
+    bgm_stop();
     GameLeaveA();
     GameLeaveB();
 }
@@ -186,6 +192,13 @@ static int32_t service(void)
     /* wheel: any step = hold (T2) */
     uint8_t wa = WHEEL_A, wb = WHEEL_B;
     if (wa != S.wa || wb != S.wb) { S.pulses |= IN_HOLD; S.wa = wa; S.wb = wb; }
+
+    if (S.bgm_pending && S.painted) {
+        S.bgm_pending = 0;
+        bgm_start(S.seed ^ now_us());
+        S.dirty = 1;
+    }
+    bgm_poll();
 
     /* fixed 60 fps steps from the SysTick clock */
     uint32_t t = now_us(), dt = t - S.last_us;
@@ -235,7 +248,7 @@ static void info_page(void)
     uint32_t running = STOCK_FN(0x03057C7C, uint32_t, uint32_t, uint32_t)(rd32(0x030232BC), 0x030361A4);
     static const uint8_t d4[3] = {4, 4, 4}, d8[2] = {8, 8}, dfs[3] = {2, 8, 2}, ddk[3] = {2, 2, 1};
     uint32_t v[3];
-    text(14, 10, "INFO", C_DIM);
+    text(14, 10, "INFO  B BACK", C_DIM);
     v[0] = rd16(SYSC + 0x89);  v[1] = rd16(PREC + 0xF2); info_line(1, "SRC", v, d4, 2);
     v[0] = rd16(SYSC + 0x18B); v[1] = rd16(PREC + 0xF4); info_line(2, "DEP", v, d4, 2);
     v[0] = rd16(SYSC + 0x5E);  v[1] = rd16(PREC + 6);    info_line(3, "IDX", v, d4, 2);
@@ -256,7 +269,9 @@ static void info_page(void)
     }
     b[k] = 0;
     text(14, 10 + 11 * 16, b, C_TEXT);
-    text(14, 10 + 13 * 16, "B BACK", C_DIM);
+    static const uint8_t dbg1[3] = {2, 8, 8}, dbg2[3] = {8, 4, 4};
+    v[0] = M.fstype; v[1] = M.root; v[2] = M.clus_fdt; info_line(12, "BG", v, dbg1, 3);
+    v[0] = M.clus_ex; v[1] = M.files; v[2] = M.cur;    info_line(13, "BX", v, dbg2, 3);
 }
 
 static void paint(void)
@@ -271,7 +286,19 @@ static void paint(void)
         return;
     }
     if (GetMsg(MSG_DRAW) || !CACHE.valid) {
+        int full = !CACHE.valid;
         bg_render(&G, 0, 0, &CACHE);
+        if (full) {                                  /* MUSIC panel, bottom left (free space) */
+            panel(LX, 172, PW, 40, C_BORDER, C_PANEL);
+            text_c(LX, PW, 176, "MUSIC", C_DIM);
+            S.bgm_shown = 0xFF;
+        }
+        if (S.bgm_shown != M.status) {
+            S.bgm_shown = M.status;
+            fill(LX + 2, 194, PW - 4, 14, C_PANEL);
+            text_c(LX, PW, 194, M.status == BGM_OFF && S.bgm_pending ? "..." : bgm_label(), C_TEXT);
+        }
+        S.painted = 1;
         S.dirty = 0;
     }
     COLOR = old_color;
