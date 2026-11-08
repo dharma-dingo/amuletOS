@@ -204,3 +204,12 @@ resident above the game's code window, so no decoder of our own).
    (stock's fill is per-pixel); find the screen flush path for a steady 60 fps.
 4. **Wheel input** for hold (read the encoder ourselves while the game runs, so it doesn't
    change volume), then the main menu's Games tile launches the game directly ("Blockz").
+
+## Timer speed check (build 29)
+
+Owner (build 28): the Sprint timer runs about 1.5x fast (1 s shown in about 0.6-0.7 s). Blockz paces from stock's
+10 ms tick (0x0302288C) plus SysTick VAL; stock sets LOAD = clock * 10 / 1000 - 1 from its clock variable
+*(0x030065C0 + 0x18) (0x030621C8, CLKSOURCE = core). If that variable is below the real core clock, every tick is
+short. INFO page (pause, then Left) row TM: ms since Blockz opened by SysTick, ms by the music position (real time
+while one track plays), ratio x1000 (hex). Row CK: LOAD, the clock variable, SysTick CTRL. Read it after a minute
+or more with music already playing when Blockz opened, before the track changes.

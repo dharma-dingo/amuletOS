@@ -99,12 +99,12 @@ def now_playing(t=T_SKY):
     status_strip(cv, t)
     diamond_bg(cv, t, 17)
     panel(cv, 4, 18, 68, 68, t, False)                  # art frame: covers stock art at 10..126 / 23..132 px
-    # info panel runs off the right edge: stock clears each text line with a 128 px strip (image 069)
-    # from x=168 to the screen edge, so the panel interior must reach the edge to hide it
-    panel(cv, 73, 18, 80, 68, t, False)
+    # info panel, inset from the screen edge (owner, build 28: the rounded screen corners cut it off);
+    # game/device/npui.c draws artist / album inside it (x 152..280)
+    panel(cv, 73, 18, 72, 68, t, False)
     # v0.3 layout A: artist and album text only (game/device/npui.c draws them), no icons
-    # title / progress / time band, full width: the scrolling title line clears a 296 px strip (image 028)
-    panel(cv, -4, 84, 156, 34, t, False)
+    # title / progress / time band, inset like the info panel: fill x 10..281, y 172..223 (npui.c TX0/TX1/TY0)
+    panel(cv, 3, 84, 142, 32, t, False)
     return cv
 
 def np_line_strip(w, t=T_SKY):

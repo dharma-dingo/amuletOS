@@ -32,9 +32,17 @@ def background():
     return ((a[..., 0] >> 3) << 11 | (a[..., 1] >> 2) << 5 | (a[..., 2] >> 3)).astype("<u2")
 
 
+CORNER = 18   # rough radius of the AP30's rounded screen bezel (owner, build 28), drawn black in the preview
+
+
 def to_image(raw):
     v = np.frombuffer(raw, "<u2").reshape(240, 296).astype(np.uint32)
     rgb = np.stack([(v >> 11) << 3, ((v >> 5) & 63) << 2, (v & 31) << 3], -1).astype(np.uint8)
+    yy, xx = np.mgrid[0:240, 0:296]
+    for cx, cy in ((CORNER, CORNER), (295 - CORNER, CORNER), (CORNER, 239 - CORNER), (295 - CORNER, 239 - CORNER)):
+        out = ((xx - cx) * np.sign(xx - cx) > 0) & ((yy - cy) * np.sign(yy - cy) > 0)
+        near = ((xx < CORNER) | (xx > 295 - CORNER)) & ((yy < CORNER) | (yy > 239 - CORNER))
+        rgb[near & out & (((xx - cx) ** 2 + (yy - cy) ** 2) > CORNER ** 2) & (np.abs(xx - cx) <= CORNER + 1) & (np.abs(yy - cy) <= CORNER + 1)] = 0
     return Image.fromarray(rgb)
 
 

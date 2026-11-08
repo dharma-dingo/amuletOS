@@ -31,7 +31,6 @@
 #define AudioClose()         STOCK_FN(0x0308D86E, void, uint32_t)(1)
 #define AudioControl(c, a)   STOCK_FN(0x0308BF84, uint32_t, uint32_t, uint32_t)(c, a)
 #define FlashRead(o, n, b)   STOCK_FN(0x03068194, uint32_t, uint32_t, uint32_t, uint32_t, void *)(0x30001, o, n, b)
-#define TotalFiles(f, m)     STOCK_FN(0x0305ADA8, uint32_t, const void *, uint32_t)(f, m)
 #define MAX_TRACKS 64
 
 enum { BGM_OFF, BGM_KEPT, BGM_NOCARD, BGM_NOFOLDER, BGM_NOFILE, BGM_PLAY, BGM_ERRFIND, BGM_ERRSTART };
@@ -74,8 +73,10 @@ static uint32_t m_random(uint32_t n)
  * +0 = folder cluster, +4 = file number. Collect the tracks whose folder is /_blockgame/. */
 static void db_collect(void)
 {
-    uint32_t base = m_rd32(SYSC + 0x79), total = TotalFiles(FILTER, 3), rec[2];
-    if (total > 20000) total = 20000;
+    /* library track count = sys+0x2E (written by the build, module 5); TotalFiles(FILTER, 3) turned out to count
+     * the current folder for source 0x63, often 0 in Blockz (build 26-28: EMPTY). Stop at erased records. */
+    uint32_t base = m_rd32(SYSC + 0x79), total = *(volatile uint16_t *)(SYSC + 0x2E), rec[2];
+    if (!total || total > 20000) total = 20000;
     for (uint32_t r = 0; r < total && M.files < MAX_TRACKS; r++) {
         FlashRead((base << 9) + (r << 11), 8, rec);
         if (rec[0] == 0xFFFFFFFFu) break;

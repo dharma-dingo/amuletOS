@@ -22,19 +22,19 @@ typedef struct { uint16_t x0, y0, x1, y1; } rect_t;
 
 /* layout (screen pixels) */
 #define RX0 152            /* right panel text */
-#define RX1 293            /* the panel runs off the screen edge */
+#define RX1 280            /* panel fill ends at 281 (inset from the rounded screen corners) */
 #define ARTIST_Y 44
 #define ALBUM_Y  94
 #define LINE_GAP 20
-#define TX0 12             /* title band, double size */
-#define TX1 283
-#define TY0 174
+#define TX0 14             /* title band, double size (panel fill x 10..281, y 172..223) */
+#define TX1 279
+#define TY0 172
 #define TH  32
-#define BAR_X0 64          /* progress bar; 48 px each side for "-1:05:01" */
-#define BAR_X1 230
-#define BAR_Y  216
-#define TIME_Y 211
-#define COUNT_X 8          /* status bar track counter */
+#define BAR_X0 62          /* progress bar; room each side for "-1:05:01" */
+#define BAR_X1 226
+#define BAR_Y  212
+#define TIME_Y 209
+#define COUNT_X 18         /* status bar track counter, clear of the rounded corner */
 #define COUNT_Y 9
 #define TSPACE 5           /* space in the big title (single-size px; the font's 8 doubles too wide) */
 #define GAP_S 24           /* scroll loop gap (single-size px) */
@@ -128,7 +128,7 @@ void np_count(uint32_t n, uint32_t total)
 {
     uint16_t s[24], *p = put_num(s, n, 1);
     *p++ = '/'; p = put_num(p, total, 1); *p = 0;
-    fill(COUNT_X, COUNT_Y, 100, COUNT_Y + 16, C_PANEL);
+    fill(COUNT_X, COUNT_Y, 102, COUNT_Y + 16, C_PANEL);
     SetFont(2);
     COLOR = C_TEXT;
     Text(COUNT_X, COUNT_Y, s);
@@ -161,7 +161,7 @@ void np_progress(void)
     int w = BAR_X1 - BAR_X0 - 3;
     if (pos > tot) pos = tot;
     int px = tot >= 16 ? (int)((pos >> 4) * (uint32_t)w / (tot >> 4)) : 0;   /* 32-bit: tracks up to ~5 h */
-    fill(BAR_X0 - 2, BAR_Y - 5, BAR_X1 + 2, BAR_Y + 12, C_PANEL);   /* old playhead */
+    fill(BAR_X0 - 2, BAR_Y - 4, BAR_X1 + 2, BAR_Y + 11, C_PANEL);   /* old playhead */
     fill(BAR_X0, BAR_Y, BAR_X1, BAR_Y + 7, C_BORDER);
     fill(BAR_X0 + 2, BAR_Y + 2, BAR_X1 - 2, BAR_Y + 5, C_SHADE);
     if (px > 0) fill(BAR_X0 + 2, BAR_Y + 2, BAR_X0 + 1 + px, BAR_Y + 5, C_ACCENT);

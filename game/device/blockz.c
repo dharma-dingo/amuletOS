@@ -52,6 +52,7 @@ static struct {
     uint32_t vol_until;          /* MUSIC panel shows the volume until this time */
     char music_txt[10];          /* what the MUSIC panel value shows now */
     uint32_t seed;
+    uint32_t t0_us, a0_ms;       /* clock check (INFO TM): start time by SysTick and by the music position */
 } S;
 
 /* Ladder debounce. Releasing a button sweeps the voltage UP the ladder (Right 0 -> Up 119 -> Left 241 ->
@@ -71,6 +72,13 @@ void bg_fill_rect(int x, int y, int w, int h, uint16_t c)
 {
     COLOR = c;
     FillRect(x, y, x + w - 1, y + h - 1);
+}
+
+/* music position in ms (stock play state P[1], real time while a track plays), 0 if none */
+static uint32_t play_ms(void)
+{
+    uint32_t *P = *(uint32_t **)0x030483D0u;
+    return P ? P[1] : 0;
 }
 
 static uint32_t now_us(void)
@@ -149,7 +157,8 @@ static void init(void)
     uint32_t best = G.best;
     bg_init(&G, &c, S.seed);
     G.best = best;
-    S.last_us = now_us();
+    S.last_us = S.t0_us = now_us();
+    S.a0_ms = play_ms();
     S.wa = WHEEL_A; S.wb = WHEEL_B;
     S.bgm_pending = 1;               /* music check after the first frame is on screen */
     S.bgm_shown = 0xFF;
@@ -267,10 +276,14 @@ static void info_page(void)
     v[0] = rd16(SYSC + 0x5E);  v[1] = rd16(PREC + 6);    info_line(3, "IDX", v, d4, 2);
     v[0] = rd32(PREC + 0x34);  v[1] = rd32(PREC + 0x38); info_line(4, "CL", v, d8, 2);
     v[0] = rd8(0x0307E710); v[1] = rd32(0x0307F250); v[2] = rd8(0x0307EFC8); info_line(5, "FS", v, dfs, 3);
-    for (int i = 0; i < 3; i++) v[i] = rd16(SYSC + 0x81 + 2 * i);  info_line(6, "ST", v, d4, 3);
     for (int i = 0; i < 3; i++) v[i] = rd16(SYSC + 0x18D + 2 * i); info_line(7, "SX", v, d4, 3);
     v[0] = rd32(SYSC + 0x79);  v[1] = rd32(SYSC + 0x7D); info_line(8, "XX", v, d8, 2);
-    v[0] = rd16(SYSC + 0x195); v[1] = rd16(SYSC + 0x197); info_line(9, "AA", v, d4, 2);
+    /* clock check (owner: timer runs ~1.5x fast): ms since Blockz opened by SysTick vs by the music position */
+    v[0] = (now_us() - S.t0_us) / 1000u; v[1] = play_ms() - S.a0_ms;
+    v[2] = v[0] ? v[1] * 1000u / v[0] : 0;               /* 1000 = SysTick right */
+    { static const uint8_t dtm[3] = {6, 6, 4}; info_line(9, "TM", v, dtm, 3); }
+    v[0] = ST_LOAD; v[1] = rd32(0x030065C0u + 0x18); v[2] = *(volatile uint32_t *)0xE000E010u;
+    { static const uint8_t dck[3] = {6, 8, 2}; info_line(6, "CK", v, dck, 3); }
     v[0] = rd8(SYSC + 0x0E); v[1] = rd8(SYSC + 0x1F); v[2] = running; info_line(10, "DK", v, ddk, 3);
     char b[24]; int k = 0;                      /* first letters of the current path */
     b[k++] = 'P'; b[k++] = ' ';
