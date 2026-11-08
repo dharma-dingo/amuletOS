@@ -153,6 +153,23 @@ go to stock FillRect; background drawn as 2 px runs). 6.8 KB code, 840 B data+ZI
 
 ## Background music (owner, 2026-11-07) - release v0.21
 
+**Behaviour (owner, revised):** if music is already playing when Blockz opens, leave it alone (it carries on as
+normal). If nothing is playing, play a **random** track from `/_blockgame/` on the SD card, and keep picking random
+tracks from that folder **on loop until Blockz is exited** (then stop). Any audio file in the folder counts. No
+folder or no file: start silently at once.
+
+**INFO page reading (build 23, after playing "Classic Theme" from Folders):** SRC 0002/0063, DEP 0002/0000,
+IDX 20BF/20BF, CL 000A0C32/00000001, FS 03/00089908/02, ST 0000 0001 000B, SX 0001 0002 0000,
+XX 00001400/00053420, AA 0001/0000, DK 04 01 1, P "FILES". So Folders playback runs in source 0x63 = "all audio
+files on the card" with a card-wide index (8383 here); the file is opened from record +0x34 (folder cluster
+0x000A0C32 = /_blockgame) and +0x38 (file 1). That explains the owner's report that after the song ended the
+player moved to an unrelated song (next card-wide index), and is a likely cause of the slow start from Folders
+(card-wide counting). Open = 0x030598E6(&rec+0x14, rec+0x34, rec+0x38 - 1, type 1 if source 6 else 3, 0x030056BC).
+Only AudioStart writes +0x34 by literal (root cluster when 0); the index -> (cluster, number) step writes through
+a struct pointer and is still to be found, along with the player command that reopens the requested file.
+
+Earlier plan (superseded by the behaviour above):
+
 Play a track from storage on loop while the game runs, using stock's music engine (it stays
 resident above the game's code window, so no decoder of our own).
 
