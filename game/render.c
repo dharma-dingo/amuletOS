@@ -31,6 +31,7 @@ static const uint32_t PIECE[8] = {
 #define PW     76
 
 static uint16_t *FB; static int STRIDE; static bg_rcache_t *RC;
+int bg_pause_volume = -1;
 
 static uint32_t mixc(uint32_t a, uint32_t b, int k /* /16 */)
 {
@@ -264,8 +265,14 @@ static void overlay(const bg_game_t *g, int ov)
         break;
     case OV_PAUSE: {
         static const char *items[3] = { "RESUME", "RETRY", "QUIT" };
-        panel(x, 66, w, 92, C_BORDER, C_PANEL);
+        int vh = bg_pause_volume >= 0 ? 18 : 0;
+        panel(x, 66, w, 92 + vh, C_BORDER, C_PANEL);
         text_c(x, w, 74, "PAUSE", C_DIM);
+        if (vh) {                                /* wheel adjusts it while paused */
+            char *p = s; *p++ = 'V'; *p++ = 'O'; *p++ = 'L'; *p++ = ' ';
+            put_u(p, (uint32_t)bg_pause_volume, 1);
+            text_c(x, w, 152, s, C_DIM);
+        }
         for (int i = 0; i < 3; i++) {
             int ty = 98 + i * 18;
             text(x + 22, ty, items[i], C_TEXT);
@@ -330,7 +337,8 @@ int bg_render(const bg_game_t *g, uint16_t *fb, int stride, bg_rcache_t *rc)
     else if (g->state == ST_FAIL) ov = OV_FAIL;
     else if (g->state == ST_PLAY && g->time < 30 && !g->pieces) ov = OV_GO;   /* GO stays 0.5 s into play */
 
-    int ov_changed = ov != rc->overlay || (ov == OV_PAUSE && g->pause_sel != rc->sel);
+    int ov_changed = ov != rc->overlay ||
+                     (ov == OV_PAUSE && (g->pause_sel != rc->sel || rc->vol != bg_pause_volume));
     if (ov_changed)                              /* cells under the old overlay redraw */
         for (int r = 0; r < BG_VISIBLE; r++) for (int x = 0; x < BG_W; x++) rc->view[r][x] = 0xFF;
 
@@ -345,7 +353,7 @@ int bg_render(const bg_game_t *g, uint16_t *fb, int stride, bg_rcache_t *rc)
             if (rc->view[r][x] != c) { rc->view[r][x] = c; cell(r, x, c); changed = 1; }
         }
     if (ov != OV_NONE && (changed || ov_changed)) overlay(g, ov);
-    rc->overlay = (uint8_t)ov; rc->sel = g->pause_sel;
+    rc->overlay = (uint8_t)ov; rc->sel = g->pause_sel; rc->vol = (int16_t)bg_pause_volume;
 
     /* HOLD / NEXT */
     uint8_t nx = (g->state == ST_DONE) ? 0 : g->queue[0];

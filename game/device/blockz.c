@@ -34,6 +34,9 @@
 #define K_B        0x040
 #define K_A        0x080
 #define K_START    0x100
+#define K_WHEEL_A  0x200            /* GetKey turns wheel steps into events (0x03062A78): counter 0x030226E4 */
+#define K_WHEEL_B  0x400            /* counter 0x030226E5; which one is "up" is still to be confirmed */
+#define VOLUME     (*(volatile uint8_t *)(0x03022894 + 0x12))   /* 0..100; applied by player command 0xF8 */
 
 static bg_game_t G;
 static bg_rcache_t CACHE;
@@ -187,11 +190,19 @@ static int32_t service(void)
         case K_B:      S.pulses |= IN_CCW; break;
         case K_UP:     S.pulses |= IN_UP; break;
         case K_START:  S.pulses |= IN_START; break;
+        case K_WHEEL_A:
+        case K_WHEEL_B:
+            if (G.state == ST_PAUSE) {               /* paused: the wheel sets the volume */
+                int v = VOLUME + ((ev & 0x1FF) == K_WHEEL_A ? 1 : -1);
+                if (v < 0) v = 0;
+                if (v > 100) v = 100;
+                VOLUME = (uint8_t)v;
+                if (ThreadRunning(m_rd32(PHAND), PDESC) == 1) AudioControl(0xF8, 0);
+                S.dirty = 1;
+            } else S.pulses |= IN_HOLD;              /* playing: hold (either direction until confirmed) */
+            break;
         }
     }
-    /* wheel: any step = hold (T2) */
-    uint8_t wa = WHEEL_A, wb = WHEEL_B;
-    if (wa != S.wa || wb != S.wb) { S.pulses |= IN_HOLD; S.wa = wa; S.wb = wb; }
 
     if (S.bgm_pending && S.painted) {
         S.bgm_pending = 0;
@@ -277,6 +288,7 @@ static void info_page(void)
 static void paint(void)
 {
     uint16_t old_color = COLOR;
+    bg_pause_volume = VOLUME;
     if (GetMsg(MSG_CLEAR)) CACHE.valid = 0;
     if (S.info) {
         GetMsg(MSG_DRAW);

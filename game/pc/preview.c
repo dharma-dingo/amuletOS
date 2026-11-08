@@ -28,6 +28,7 @@ int main(int argc, char **argv)
     bg_cfg_t c; bg_default_cfg(&c);
     bg_init(&g, &c, seed);
     bot_t b; bot_init(&b, 8);
+    bg_pause_volume = 42;                        /* show the device's pause-panel volume line */
     int got_mid = 0, got_late = 0, paused = 0, pause_frames = 0;
 
     for (int f = 0; f < 60 * 60 * 5; f++) {
