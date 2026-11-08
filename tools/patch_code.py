@@ -108,7 +108,21 @@ def np_v3():
         (27, 0x03082B04, "e1f7ccfc", NOP2),                                                 # line 3 empty fallback
     ]
 
-GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3}
+def lib_skip():
+    """Library scan skip (game/device/libscan.c): module 5 builds only when the SD card's fingerprint changed;
+    stock's config save appends the fingerprint; Folders "Update Library?" Yes always rebuilds."""
+    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    nop = bytes.fromhex("00bf")
+    return [
+        # m5 service: strh r4,[r5,#0x42]; strb r4,[r5,#0x64]; bl Build; movw r0,#0x18d; bl Post -> bl lib_gate
+        (5, 0x03081754, "a5f8424085f86440fff764ff40f28d10e6f7b6fb",
+         (thumb_bl(0x03081754, h["lib_gate"]) + nop * 8).hex()),
+        (0, 0x0306D5C0, "fff79eff", thumb_bl(0x0306D5C0, h["cfg_write"]).hex()),     # SaveSysConfig block write
+        (31, 0x0308219E, "a5f84290", thumb_bl(0x0308219E, h["lib_force"]).hex()),   # strh sb,[r5,#0x42]
+        (1, 0x030827EA, "eaf789fe", thumb_bl(0x030827EA, h["cfg_boot_write"]).hex()),  # boot config rewrite
+    ]
+
+GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "lib_skip": lib_skip}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)

@@ -224,16 +224,41 @@ out text wider than its current advances (clipping or scrolling).
   and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
   (stock FileWrite exists) to dump these structures after playing a file from Folders.
 
-## Library update trigger (traced 2026-11-07, for the v0.3 scan skip)
+## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
-- Main menu Music tile (m21 0x030818BA): if the player is not running and system config +0x0F == 4 (SD seen),
-  it checks card detect 0x03056C86(0, 0x0B); if set it writes sys +0x42 = 1 ("library needs update"). Then, if
-  sys +0x42 == 1 -> TaskSwitch(13) = module 5 (MDBBuildWin, the "updating library" screen, scanner module 38);
-  else TaskSwitch(1) = MediaLib. Stock block game (m82) sets +0x42 the same way. So every boot with the card in
-  rebuilds on the first visit to Music.
-- Plan: replace the "set +0x42 = 1" with a fingerprint test (card serial + allocation, e.g. exFAT bitmap use or
-  FAT32 FSInfo free count) against a fingerprint saved after a successful build. To find: where the build clears
-  +0x42 (save the fingerprint there), a persistent place for it, and stock's raw SD sector read.
+- **sys +0x42 = "library needs update"**, set by: boot config load (m1 0x03082784 / 0x03082798: when the saved
+  config's +0x2E9 is not 0x55AA, i.e. the last save was not SaveSysConfig(1)); main loop when card state
+  0x03022880 == 1 (m0 0x03066DF8, then disk 4 and TaskSwitch(13) at once); card removed while on SD
+  (m0 0x030666D6); Music tile when the library is from SD (+0x0F == 4) but card detect GPIO0 pin 11 reads 1
+  (no card; m21 0x030818EA); card inserted while in Library (m22 0x030819B4); USB session with writes
+  (m12 0x030836AC); Folders "Update Library?" Yes (text 120, shown when the chosen disk differs from +0x0F;
+  m31 0x0308219E); internal disk format at boot (m1 0x030819F0); Settings resets (m32 0x03081B62/0x03081B98,
+  0x03081BF0); stock block game. Everything ends in TaskSwitch(13) or in the Music tile's test
+  (+0x42 == 1 -> TaskSwitch(13)).
+- **Module 5 (MDBBuildWin)** service 0x03081740: if +0x42: clear +0x42 and +0x64, run the build
+  0x03081628 (synchronous: +0x0F = +0x0E, modules 38/39/40, ends with SaveSysConfig(0)), post 0x18D; then
+  TaskSwitch(target from its argument). 0x18D/0x18E/0x18F = recount free space of disk 2/3/4 (module 7 at
+  0x03081924, results in 0x030041C8..0x030041DC; exFAT path reads the allocation bitmap).
+- **System config persistence:** SaveSysConfig(f) = 0x0306D564: memset 0x800 buffer to 0xFF, +0x2E9 =
+  f ? 0x55AA : 0, crc of 0x2F1 bytes at +0x2F1, copy 0x2F5 bytes, ModuleOverlay(2, 7), block write
+  0x0306D500(0, buf, 0x800). Block read 0x0306D48E(n, buf, len) reads ceil(len/512) sectors. Boot loader
+  (m1 0x03082090) reads block 0, checks crc (bad -> defaults, buffer 0xFF), copies fields, then rewrites block 0
+  from that buffer (ModuleOverlay(2, 7) at 0x030827B0, write at 0x030827EA): bytes after 0x2F5 survive a good
+  boot and are wiped by a reset to defaults. Block 0 is written only by these two.
+- **exFAT volume info** (mount 0x030582A8, boot sector parse): 0x0307E710 FS type, +2 u16 sectors/cluster shift
+  (boot+0x6D), +4 u16 bytes/sector shift (boot+0x6C); 0x0307E71C +0x0D root cluster, +0x1B cluster count,
+  +0x1F cluster heap (absolute sector), +0x23 partition start, +0x2B FAT start, +0x2F percent in use.
+  Raw sector read of the current disk: 0x03057CC8(lba, buf) (absolute LBA).
+- **Scan skip (build 27, `game/device/libscan.c`, patch `lib_skip`):** m5 0x03081754 (clear, build, post) ->
+  `lib_gate`: skip when the saved fingerprint equals the card's and the database has a first record;
+  otherwise forget the fingerprint (save), build, post 0x18D, save the new fingerprint. Fingerprint of an exFAT
+  SD card: serial (boot+0x64), cluster count, FNV-1a of the root directory's first cluster (up to 64 sectors;
+  File entries without set checksum and access time), FNV-1a of the whole allocation bitmap. FAT, internal disk:
+  no fingerprint, always build (stock). Stored at block 0 +0x300 {magic "SKF1", 4 words, ~magic} and in RAM
+  0x0309FFC0 (above the slot-2 code). SaveSysConfig's write (m0 0x0306D5C0) -> `cfg_write` appends it; the boot
+  rewrite (m1 0x030827EA) -> `cfg_boot_write` loads RAM from it; Folders Yes (m31 0x0308219E) -> `lib_force`.
+  Misses: a file rewritten in place (same clusters) below the top level, e.g. a tag edit with padding. Manual
+  rebuild: Folders, pick the other disk, Yes, then back to the SD card, Yes.
 
 ## Stock Now Playing (module 27), traced 2026-11-07
 

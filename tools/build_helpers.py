@@ -13,7 +13,7 @@ import json, os, shutil, struct, subprocess, sys
 
 ARM = r"C:\Users\Admin\tools\arm-gnu-toolchain\arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\bin"
 BASE, SLOT = 0x03050000, 2
-RUN0, RUN_END = 0x0309F800, 0x0309FFF0
+RUN0, RUN_END = 0x0309F800, 0x0309FFC0   # 0x0309FFC0.. = libscan.c fingerprint (FP), 0x0309FFF0 = stock reset magic
 FILE_END = 0x58800               # keep clear of the Blockz module (build_module.py --at 0x58800)
 
 def tool(n): return os.path.join(ARM, f"arm-none-eabi-{n}.exe")
@@ -44,7 +44,7 @@ def main():
         "-Wl,-Map=" + os.path.join(work, "helpers.map"), "-o", elf, *sources)
     sizes = {f[0]: int(f[1], 16) for f in (l.split() for l in run(tool("size"), "-A", "-x", elf).splitlines())
              if len(f) == 3 and f[0].startswith(".")}
-    for s in (".data", ".bss"):
+    for s in (".data", ".bss", ".rodata"):
         assert not sizes.get(s), f"helpers must not use {s}"
     run(tool("objcopy"), "-O", "binary", "-j", ".text", elf, bin_)
     blob = open(bin_, "rb").read()
@@ -58,8 +58,8 @@ def main():
     open(os.path.join(out, "code.bin"), "wb").write(code)
     json.dump({k: v for k, v in syms.items() if not k.startswith("$")}, open(os.path.join(out, "helpers.json"), "w"), indent=1)
     print(f"slot 2: helpers {len(blob)} B at run {at_run:#x} (code.bin {at_file:#x}); slot size {cs:#x} -> {(at_run - ce) + len(blob):#x}")
-    for k in ("np_artist", "np_title_width", "np_title_draw", "np_title_fill"):
-        print(f"  {k} = {syms[k]:#x}")
+    for k in ("np_artist", "np_title_width", "np_title_draw", "np_title_fill", "lib_gate", "cfg_write", "cfg_boot_write", "lib_force"):
+        if k in syms: print(f"  {k} = {syms[k]:#x}")
 
 if __name__ == "__main__":
     main()

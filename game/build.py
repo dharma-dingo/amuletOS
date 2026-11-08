@@ -31,6 +31,9 @@ def test():
     lad = OUT / "test_ladder.exe"     # device shell's button debounce, compiled for the PC
     run(ZIG + ["-O1", "-w", "-I", ROOT, "-o", lad, ROOT / "test" / "test_ladder.c"])
     run([lad])
+    lib = OUT / "test_libscan.exe"    # library scan skip (device/libscan.c) on a simulated exFAT card
+    run(ZIG + ["-O1", "-w", "-I", ROOT, "-o", lib, ROOT / "test" / "test_libscan.c"])
+    run([lib])
 
 def preview():
     from PIL import Image
