@@ -224,6 +224,17 @@ out text wider than its current advances (clipping or scrolling).
   and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
   (stock FileWrite exists) to dump these structures after playing a file from Folders.
 
+## Library update trigger (traced 2026-11-07, for the v0.3 scan skip)
+
+- Main menu Music tile (m21 0x030818BA): if the player is not running and system config +0x0F == 4 (SD seen),
+  it checks card detect 0x03056C86(0, 0x0B); if set it writes sys +0x42 = 1 ("library needs update"). Then, if
+  sys +0x42 == 1 -> TaskSwitch(13) = module 5 (MDBBuildWin, the "updating library" screen, scanner module 38);
+  else TaskSwitch(1) = MediaLib. Stock block game (m82) sets +0x42 the same way. So every boot with the card in
+  rebuilds on the first visit to Music.
+- Plan: replace the "set +0x42 = 1" with a fingerprint test (card serial + allocation, e.g. exFAT bitmap use or
+  FAT32 FSInfo free count) against a fingerprint saved after a successful build. To find: where the build clears
+  +0x42 (save the fingerprint there), a persistent place for it, and stock's raw SD sector read.
+
 ## Stock Now Playing (module 27), traced 2026-11-07
 
 - Window descriptor: tick 0x030823BE, service 0x03083688, paint 0x030835EC, init 0x030815C4, deinit 0x03081658.
