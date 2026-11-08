@@ -97,7 +97,12 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
 ## Backlog (next version)
 
 - **Play-start delay (owner, 2026-11-07):** the slow start (~3 s) happens when a song is started from **Folders** (file browser), not from **Music** (library). Points at the folder-mode path (directory scan / file count in the current folder, `0x0305ADA8`, re-navigation from the folder stack) rather than the DAC or decoder start. For v0.3.
-- **Library update (owner, 2026-11-07):** stock forces a full "updating library" (~1 minute) even when nothing changed on the SD card. Find an elegant fix: skip the scan unless the user asks for it (an Update Library item in Settings), or only scan when a cheap check (card serial + root/folder timestamps or file count) shows a change. First step: find what triggers the scan at boot/card insert in stock (could be a small patch for v0.1/v0.2, before our own library code).
+- **Library update (owner, 2026-11-07):** stock forces a full "updating library" (~1 minute) even when nothing changed on the SD card. Plan (agreed 2026-11-07, for when we do this work):
+  1. *Skip when unchanged (patch to stock):* after a successful build, save a card fingerprint (volume serial + space in use from the exFAT boot sector / FAT32 FSInfo, plus root entry count); at boot compare and skip the scan if equal. First step: trace what starts the scan (likely TaskSwitch to task 13 = module 5, MDBBuildWin; scanner = module 38) and the check before it.
+  2. *Manual "Update library" item in Settings* for when music was added or the fingerprint misses a change.
+  3. *Own library (v0.2+): incremental, in the background:* per-folder fingerprint (entry count + newest timestamp), re-read tags only in changed folders, scan while playing with a small status marker (P0: playable within 3 s of power-on).
+  Why it is slow: ~8,400 tracks on the owner's card, every file opened for tags; library DB lives on the hidden internal partition (module 34 reads 2 KB records: +0 folder cluster, +4 file number, +0x400 name, +0x500 artist, +0x600 album, +0x700 genre).
+  Observed 2026-11-07 (build 25): no scan at power-on that time; it started when Music was opened.
 - **Song lists (owner, 2026-11-07, future):** at song level, stock's music navigation shows file names. Show the title tag instead (file name only when there is no tag), sorted by disc number, then track number, then file name.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 
