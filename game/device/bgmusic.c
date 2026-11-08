@@ -30,6 +30,9 @@
 #define RecPrepare()         STOCK_FN(0x03055304, void, void)()
 #define AudioClose()         STOCK_FN(0x0308D86E, void, uint32_t)(1)
 #define AudioControl(c, a)   STOCK_FN(0x0308BF84, uint32_t, uint32_t, uint32_t)(c, a)
+#define FlashRead(o, n, b)   STOCK_FN(0x03068194, uint32_t, uint32_t, uint32_t, uint32_t, void *)(0x30001, o, n, b)
+#define TotalFiles(f, m)     STOCK_FN(0x0305ADA8, uint32_t, const void *, uint32_t)(f, m)
+#define MAX_TRACKS 64
 
 enum { BGM_OFF, BGM_KEPT, BGM_NOCARD, BGM_NOFOLDER, BGM_NOFILE, BGM_PLAY, BGM_ERRFIND, BGM_ERRSTART };
 
@@ -43,6 +46,8 @@ static struct {
     uint8_t  status, mine;       /* mine: we started the player and own it until exit */
     uint8_t  fstype;
     uint32_t root, clus_fdt, clus_ex, clus, files, cur, seen_clus, seen_num, rnd;
+    uint8_t  from_db;            /* file numbers came from the library database */
+    uint16_t nums[MAX_TRACKS];   /* file numbers (1-based) of the folder's tracks, when from_db */
     uint8_t  ex[0x2C];           /* /_blockgame/'s directory info (exFAT) */
 } M;
 
@@ -63,6 +68,23 @@ static uint32_t m_random(uint32_t n)
 {
     M.rnd = M.rnd * 1664525u + 1013904223u;
     return n ? (M.rnd >> 8) % n : 0;
+}
+
+/* Library database (what Music uses): 2 KB records from sector sys+0x79 on the internal flash volume, record
+ * +0 = folder cluster, +4 = file number. Collect the tracks whose folder is /_blockgame/. */
+static void db_collect(void)
+{
+    uint32_t base = m_rd32(SYSC + 0x79), total = TotalFiles(FILTER, 3), rec[2];
+    if (total > 20000) total = 20000;
+    for (uint32_t r = 0; r < total && M.files < MAX_TRACKS; r++) {
+        FlashRead((base << 9) + (r << 11), 8, rec);
+        if (rec[0] == 0xFFFFFFFFu) break;
+        if (rec[1] && (rec[0] == M.clus_ex || rec[0] == M.clus_fdt)) {
+            M.clus = rec[0];
+            M.nums[M.files++] = (uint16_t)rec[1];
+        }
+    }
+    M.from_db = M.files != 0;
 }
 
 /* find /_blockgame/ in the root of the current disk; fills M.clus, M.ex, M.files */
@@ -96,6 +118,7 @@ static int find_folder(void)
                 for (int i = 0; i < 0x2C; i++) M.ex[i] = it.ex[i];
                 M.clus = M.fstype == 3 ? M.clus_ex : M.clus_fdt;
                 M.files = M.fstype == 3 ? ExFiles(M.ex, FILTER, FTYPE) : FatFiles(M.clus, FILTER, FTYPE);
+                if (!M.files) db_collect();     /* stock's folder count can return 0 (owner's folder) */
                 return M.files ? BGM_PLAY : BGM_NOFILE;
             }
         }
@@ -114,8 +137,12 @@ static void point_record(uint32_t num)
 
 static uint32_t pick_track(void)
 {
-    uint32_t n = m_random(M.files) + 1;
-    if (M.files > 1 && n == M.cur) n = n % M.files + 1;   /* no immediate repeat */
+    uint32_t i = m_random(M.files);
+    uint32_t n = M.from_db ? M.nums[i] : i + 1;
+    if (M.files > 1 && n == M.cur) {                       /* no immediate repeat */
+        i = (i + 1) % M.files;
+        n = M.from_db ? M.nums[i] : i + 1;
+    }
     return n;
 }
 

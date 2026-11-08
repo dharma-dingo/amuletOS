@@ -35,7 +35,7 @@ the next boot (the screen can stay black for a minute or two) and deletes the fi
 stamp must be newer than the installed one.**
 
 - Stamp format: `YY YY DD MM BB 00 00 00`, BCD, year little-endian, then day, month, build.
-  Today's builds use `26 20 07 11 BB`. Next free build number: **26** (`2620071126000000`).
+  Today's builds use `26 20 07 11 BB`. Next free build number: **27** (`2620071127000000`).
 - **Low battery makes the updater silently eat the file without flashing.** Charge first.
 - Pressing **B on the USB-transfer screen drops USB** (goes back to the main menu).
 
@@ -77,7 +77,7 @@ mkdir build/art_v01_all; cp build/art_v01_auto/*.png build/art_v01_all/; cp buil
 python tools/build_helpers.py build/d1 build/d1h game/device/np_helpers.c game/device/np_stub.S
 python tools/patch_code.py build/d1h build/d1h_np np_v3,np_hide_format,menu_games_to_blockz
 python tools/build_module.py build/d1h_np build/d1h_np_bz game/device/blockz.c --at 0x58800
-python tools/build_reskin.py build/d1h_np_bz build/art_v01_all 2620071125000000 --out build/v025 --font tall
+python tools/build_reskin.py build/d1h_np_bz build/art_v01_all 2620071126000000 --out build/v026 --font tall
 ```
 
 ---
@@ -171,7 +171,8 @@ been on an August build).
 | 22 | …22 | Now Playing: artist at y 49 and album at y 91, both wrapping over two lines (`np_v3`, helpers 500 B); **Blockz T2: the real game** (`game/device/blockz.c`: core + renderer via FillRect, SysTick 60 fps pacing, ADC directions, GetKey presses, wheel = hold) | Blockz runs and "everything else looks perfect" (owner); bug: random backtracks / sudden drops / shifted hard drops on about every other piece = raw ladder ADC caught mid-sweep |
 | 23 | …23 | Blockz: ladder reading accepted only after 16 ms stable (debounce); read-only INFO page (pause, then Left) showing stock's play state for v0.21 | better but same issues (owner); worst right after a hard drop: Up's release sweeps through Left/Down, and rubber pads can make sweeps slower than 16 ms |
 | 24 | …24 | Blockz: direction-aware ladder debounce (release sweeps up the ladder: 80 ms; press 24 ms, Down 40 ms; to idle 16 ms), host test `game/test/test_ladder.c` | superseded by 25 (never on device) |
-| 25 | …25 | **v0.21 attempt**: `game/device/bgmusic.c` (if nothing plays: find /_blockgame/ on SD via stock FindFirst/FindNext, random track via the play record + player thread, shuffle-loop by watching the record, stop on exit; MUSIC panel status, INFO lines BG/BX) + build 24's debounce | movement "great" (owner; d-pad hardware itself is poor). Music did not start in Blockz on the first try; no library scan had run at power-on, it started only when Music was opened afterwards. MUSIC panel status not yet reported |
+| 25 | …25 | **v0.21 attempt**: `game/device/bgmusic.c` (if nothing plays: find /_blockgame/ on SD via stock FindFirst/FindNext, random track via the play record + player thread, shuffle-loop by watching the record, stop on exit; MUSIC panel status, INFO lines BG/BX) + build 24's debounce | movement "great" (owner; d-pad hardware itself is poor). Music did not start in Blockz on the first try; no library scan had run at power-on, it started only when Music was opened afterwards. MUSIC panel: **EMPTY** (folder found by name, stock folder count 0). Stock's own Files browser also shows /_blockgame/ empty (folder recreated 16:20 by the owner's sync; likely an exFAT layout stock's folder code mishandles), while Music lists and plays the file |
+| 26 | …26 | v0.21: when stock's folder count is 0, take the folder's tracks from the library database (records +0 folder cluster, +4 file number) | built and verified on PC (`build/v026`); not on device |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX

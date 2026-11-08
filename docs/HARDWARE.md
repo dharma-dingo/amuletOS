@@ -213,6 +213,12 @@ out text wider than its current advances (clipping or scrolling).
 - Music engine in folder mode counts files in the FS *current directory*: 0x0305ADA8(filter, 1); mode 3 is used for
   source 0x63. Resume/next re-navigates from the folder stack the play request carries (record +0xF4 depth,
   +0x100/+0x110 stacks), so v0.21 must fill that stack correctly.
+- Library database: FlashRead(0x30001, offset, len, buf) = 0x03068194. Records: 2 KB each from sector sys+0x79
+  (0x1400 on the owner's unit); +0 folder cluster, +4 file number, +0x400 name, +0x500 artist, +0x600 album,
+  +0x700 genre. Sorted index of u16 record numbers from sector sys+0x7D (0x53420), read at
+  ((stack[depth] + idx[depth]) << 1) by 0x03055304.
+- Owner's /_blockgame/ (recreated by sync at 16:20): stock's Files browser lists it empty and the exFAT folder count
+  returns 0, but the library scanner found the file and Music plays it (open by folder cluster + file number works).
 - Still needed for v0.21: find /_blockgame/ on the SD card (disk select, root cluster, directory entry lookup),
   the browser's file indexing (which entries count, order), and the exact source-type value; then fill the record
   and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
