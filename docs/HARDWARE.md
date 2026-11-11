@@ -224,6 +224,22 @@ out text wider than its current advances (clipping or scrolling).
   and start the thread without opening Now Playing. Plan: a debug log written to a file on the internal drive
   (stock FileWrite exists) to dump these structures after playing a file from Folders.
 
+## Main menu keys (module 21, traced 2026-11-11)
+
+- Service 0x030819E4 switches on GetKey's event word: 0x40000010 / 0x40000020 / 0x30000010 / 0x30000020 (Up, Down
+  press and repeat) -> 0x03081CDE (index +-3); 0x40000004 / 0x30000004 (Right) -> 0x03081CF0; 0x40000008 /
+  0x30000008 (Left) -> 0x03081D1C; 0x40000080 (A) -> tile action 0x0308188E (unless msg 1, the volume overlay, is
+  up: then close it); 0x40000040 (B) closes the volume overlay; 0x40000200 / 0x40000400 (wheel) volume -/+;
+  0x41000000 / 0x42000000 open system dialogs; 0x20000100 ran the Music action. A Start press (0x40000100) fell
+  through to the exit at 0x03081B8A. Event types: 0x40 press, 0x30 repeat; 0x20 seen with Start's code (not a
+  plain press). Tile actions 0x0308188E (tbb at 0x030818B4): 0 Music (task 1), 1 Games (task 10 page 7), 2 Browser
+  mode 3 (task 9), 3 Browser mode 5 (Folders), 4 / 5 task 10 pages 3 (Bluetooth) / 4 (Setup). Init restores the
+  index from its argument byte (or 3 when 0x03005984 == 3). Tile table in the data: {1, i, i, 0, image, text id}.
+- Music menu (module 22): table {icon image, text id, action} at data 0x03023B48 (7 entries, window descriptor
+  right after at 0x03023B74); count 7 at 0x0308165A, 7 rows per page; select 0x0308170C dispatches on the action:
+  5 -> 6, 0..4 tbb, 6, 7 Favorites, 8 = library update (0x030818BE: stop player, sys+0x42 = 1, TaskSwitch(13, {1})),
+  9, 0x64. Stock ships no entry for 8; text 90 "Update" unused.
+
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
 - **sys +0x42 = "library needs update"**, set by: boot config load (m1 0x03082784 / 0x03082798: when the saved

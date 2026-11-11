@@ -182,6 +182,7 @@ def menu_carousel():
          (bytes.fromhex("0420adf8000069460a20") + thumb_bl(0x03081BB0, 0x030680D4)
           + bytes.fromhex("0126") + thumb_b16(0x03081BB6, 0x03081D74)).hex()),
         (21, 0x030815D4, "21780180", thumb_bl(0x030815D4, h["menu_idx_init"]).hex()),    # init: our position
+        (21, 0x03081B8A, "00f0f3b8", thumb_bw(0x03081B8A, h["menu_key_more"]).hex()),    # Start press -> Settings
     ]
 
 def music_update():

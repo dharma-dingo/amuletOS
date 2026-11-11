@@ -77,3 +77,16 @@ music_menu:
     .hword 0xE8, 0x57, 6      @ Directory List
     .hword 0xE8, 0x59, 7      @ Favorites
     .hword 0xE8, 0x5A, 8      @ Update
+
+@ main menu key dispatch fallthrough (module 21 0x03081B8A, was "b.w exit"): r1 = event - 0x40000010.
+@ Start press (0x40000100, r1 = 0xF0) -> the Settings code at 0x03081BA6 (menu_carousel); anything else -> exit.
+    .section .text.menu_key_more
+    .global menu_key_more
+    .thumb_func
+menu_key_more:
+    cmp     r1, #0xF0
+    ite     eq
+    ldreq   r0, =0x03081BA7
+    ldrne   r0, =0x03081D75
+    bx      r0
+    .ltorg
