@@ -259,8 +259,22 @@ out text wider than its current advances (clipping or scrolling).
   0x0305E930 = one step of the music source record 0x03022F14: rec+2 (u16) current index 1-based, rec+0 (u16) total
   (wraps to 1), rec+0xC = 1: shuffle (random from the 10 ms tick, 0x03067D78(0x23)), rec+0xF2 source type: 0x63 ->
   0x0305EA5A, 6 -> 0x0305EB2A (folder / card-wide file lookup that sets rec+0x34 cluster, rec+0x38 number).
-  **Playlist hook point:** branch at 0x0305E930's entry when rec+0xF2 is our playlist source type. Still to check:
-  that track end also goes through 0x0308CC50 / 0x0305EDC6, and what 0x030625A2 (prev) does.
+  **Playlist hook point:** 0x0305E930's entry.
+- **All song changes share this path** (traced 2026-11-11): Now Playing Next = AudioControl(0x109, 1), Prev =
+  AudioControl(0x109, -1) (m27 0x03083EAE; command 0x10A -> 0x030625A2 is just `bx lr`); track end = m33
+  0x0308D9F2 0x0308CC50(1). 0x0308CC50 is the only caller of 0x0305EDC6, which is the only caller of 0x0305E930;
+  then AudioStart (0x0308C8EE) opens the file the record names.
+- 0x0305E930 tail (0x0305EB72): rec+6 = index; rec[0x100 + 2 * rec+0xF4] = index - 1; then by source type:
+  0x63 -> 0x0305BD04(&rec+0x14, &rec+0x34, rec+0x10, 3) (stock's folder iterator over the card), 6 -> 0x0305EC3A,
+  3 -> 0x0305EC90, **0..2 (library: All Music / Artist / Album) -> 0x0305ECF0**: record number = u16 FlashRead(
+  0x30001, (rec+0xFC << 9) + 2 * (index + rec[0x110 + 2 * depth]) - 2), then 8 bytes of DB record
+  (rec+0xF8 << 9) + n * 2048 -> **rec+0x34 = folder cluster, rec+0x38 = file number** (DB record +0 / +4), +0xC ->
+  rec+0x48, +0x10 -> rec+0x4C, rec+0x44 = (+0x48 | +0x4C) != 0; returns 0 (r6) = success (0x0305EDC6 stops early on
+  non-zero).
+- **Now Playing init (m27 0x030815C4)**: arg block (TaskSwitch copy at 0x030057C0 + 0x184): u16[1] -> 0x0302283C;
+  0x03081774(arg) = if the player thread is not running: ThreadDelete(0x030232BC), ModuleOverlay(33, 7),
+  ThreadCreate(0x030232BC, 0x030361A4, arg); then **0x0308CFB8(1) = `*(u8 *)0x030483C8 = 1`** (first byte of the
+  engine's state, m33 ZI). Blockz's own start (builds 25-34) skips that store: likely why it played nothing.
 
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
