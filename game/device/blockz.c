@@ -77,8 +77,12 @@ void bg_fill_rect(int x, int y, int w, int h, uint16_t c)
 /* music position in ms (stock play state P[1], real time while a track plays), 0 if none */
 static uint32_t play_ms(void)
 {
-    uint32_t *P = *(uint32_t **)0x030483D0u;
-    return P ? P[1] : 0;
+    /* 0x030483D0 is in the music engine's (module 33) RAM: only valid while the player runs (build 31 crashed
+     * on open after a boot with nothing played: it followed whatever was there) */
+    if (STOCK_FN(0x03057C7C, uint32_t, uint32_t, uint32_t)(*(volatile uint32_t *)0x030232BCu, 0x030361A4) != 1) return 0;
+    uint32_t p = *(volatile uint32_t *)0x030483D0u;
+    if (p < 0x03000000u || p >= 0x030A0000u - 8 || (p & 3)) return 0;
+    return ((volatile uint32_t *)p)[1];
 }
 
 static uint32_t now_us(void)

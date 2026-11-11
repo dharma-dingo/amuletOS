@@ -33,7 +33,8 @@
 #define FlashRead(o, n, b)   STOCK_FN(0x03068194, uint32_t, uint32_t, uint32_t, uint32_t, void *)(0x30001, o, n, b)
 #define MAX_TRACKS 64
 
-enum { BGM_OFF, BGM_KEPT, BGM_NOCARD, BGM_NOFOLDER, BGM_NOFILE, BGM_PLAY, BGM_ERRFIND, BGM_ERRSTART };
+enum { BGM_OFF, BGM_KEPT, BGM_NOCARD, BGM_NOFOLDER, BGM_NOFILE, BGM_PLAY, BGM_ERRFIND, BGM_ERRSTART, BGM_SCAN };
+#define SCAN_STEP 24         /* library records read per service call (build 31 read all ~8400 at once and froze) */
 
 typedef struct {                 /* the browser's iterator (BrowserUI listing, sp+0 .. sp+0x47) */
     uint32_t clus, index, count;
@@ -48,6 +49,7 @@ static struct {
     uint8_t  from_db;            /* file numbers came from the library database */
     uint16_t nums[MAX_TRACKS];   /* file numbers (1-based) of the folder's tracks, when from_db */
     uint8_t  ex[0x2C];           /* /_blockgame/'s directory info (exFAT) */
+    uint32_t scan_r, scan_total, scan_base;   /* library search in progress (BGM_SCAN) */
 } M;
 
 static uint32_t m_rd32(uint32_t a) { volatile uint8_t *p = (volatile uint8_t *)a; return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
@@ -70,22 +72,31 @@ static uint32_t m_random(uint32_t n)
 }
 
 /* Library database (what Music uses): 2 KB records from sector sys+0x79 on the internal flash volume, record
- * +0 = folder cluster, +4 = file number. Collect the tracks whose folder is /_blockgame/. */
-static void db_collect(void)
+ * +0 = folder cluster, +4 = file number. Collect the tracks whose folder is /_blockgame/, SCAN_STEP records per
+ * call (bgm_poll), so Blockz keeps running while it searches. Returns 1 when the search is finished. */
+static void db_begin(void)
 {
     /* library track count = sys+0x2E (written by the build, module 5); TotalFiles(FILTER, 3) turned out to count
      * the current folder for source 0x63, often 0 in Blockz (build 26-28: EMPTY). Stop at erased records. */
-    uint32_t base = m_rd32(SYSC + 0x79), total = *(volatile uint16_t *)(SYSC + 0x2E), rec[2];
-    if (!total || total > 20000) total = 20000;
-    for (uint32_t r = 0; r < total && M.files < MAX_TRACKS; r++) {
-        FlashRead((base << 9) + (r << 11), 8, rec);
-        if (rec[0] == 0xFFFFFFFFu) break;
+    M.scan_base = m_rd32(SYSC + 0x79);
+    M.scan_total = *(volatile uint16_t *)(SYSC + 0x2E);
+    if (!M.scan_total || M.scan_total > 20000) M.scan_total = 20000;
+    M.scan_r = 0;
+}
+
+static int db_step(void)
+{
+    uint32_t rec[2];
+    for (int k = 0; k < SCAN_STEP; k++, M.scan_r++) {
+        if (M.scan_r >= M.scan_total || M.files >= MAX_TRACKS) return 1;
+        FlashRead((M.scan_base << 9) + (M.scan_r << 11), 8, rec);
+        if (rec[0] == 0xFFFFFFFFu) return 1;
         if (rec[1] && (rec[0] == M.clus_ex || rec[0] == M.clus_fdt)) {
             M.clus = rec[0];
             M.nums[M.files++] = (uint16_t)rec[1];
         }
     }
-    M.from_db = M.files != 0;
+    return 0;
 }
 
 /* find /_blockgame/ in the root of the current disk; fills M.clus, M.ex, M.files */
@@ -119,8 +130,8 @@ static int find_folder(void)
                 for (int i = 0; i < 0x2C; i++) M.ex[i] = it.ex[i];
                 M.clus = M.fstype == 3 ? M.clus_ex : M.clus_fdt;
                 M.files = M.fstype == 3 ? ExFiles(M.ex, FILTER, FTYPE) : FatFiles(M.clus, FILTER, FTYPE);
-                if (!M.files) db_collect();     /* stock's folder count can return 0 (owner's folder) */
-                return M.files ? BGM_PLAY : BGM_NOFILE;
+                if (!M.files) { db_begin(); return BGM_SCAN; }   /* stock's folder count can return 0 (owner's folder) */
+                return BGM_PLAY;
             }
         }
         if (FindNext(fdt, &it, FILTER, FTYPE) != 0) break;
@@ -147,6 +158,21 @@ static uint32_t pick_track(void)
     return n;
 }
 
+/* start the player on a random track of the folder (M.files > 0) */
+static void bgm_play(void)
+{
+    RecPrepare();                                  /* browser's play-request prep, then our file over it */
+    point_record(pick_track());
+    static uint16_t arg[2];
+    arg[0] = 1; arg[1] = 0x46;
+    ThreadDelete(PHAND);
+    ModuleLoad(33);
+    ThreadCreate(PHAND, PDESC, arg);
+    if (ThreadRunning(m_rd32(PHAND), PDESC) != 1) { M.status = BGM_ERRSTART; return; }
+    M.status = BGM_PLAY;
+    M.mine = 1;
+}
+
 /* on Blockz open */
 static void bgm_start(uint32_t seed)
 {
@@ -159,21 +185,19 @@ static void bgm_start(uint32_t seed)
         DiskSwitch(4);
     }
     M.status = (uint8_t)find_folder();
-    if (M.status != BGM_PLAY) return;
-    RecPrepare();                                  /* browser's play-request prep, then our file over it */
-    point_record(pick_track());
-    static uint16_t arg[2];
-    arg[0] = 1; arg[1] = 0x46;
-    ThreadDelete(PHAND);
-    ModuleLoad(33);
-    ThreadCreate(PHAND, PDESC, arg);
-    if (ThreadRunning(m_rd32(PHAND), PDESC) != 1) { M.status = BGM_ERRSTART; return; }
-    M.mine = 1;
+    if (M.status == BGM_PLAY) bgm_play();
 }
 
 /* every service call while Blockz runs: keep the player inside /_blockgame/ */
 static void bgm_poll(void)
 {
+    if (M.status == BGM_SCAN) {                    /* library search, a slice per call */
+        if (db_step()) {
+            M.from_db = M.files != 0;
+            if (M.files) bgm_play(); else M.status = BGM_NOFILE;
+        }
+        return;
+    }
     if (!M.mine) return;
     if (ThreadRunning(m_rd32(PHAND), PDESC) != 1) { M.mine = 0; M.status = BGM_ERRSTART; return; }
     uint32_t c = *(volatile uint32_t *)(PREC + 0x34), n = *(volatile uint32_t *)(PREC + 0x38);
@@ -201,6 +225,7 @@ static const char *bgm_label(void)
     case BGM_PLAY:     return "PLAY";
     case BGM_ERRFIND:  return "ERR 1";
     case BGM_ERRSTART: return "ERR 2";
+    case BGM_SCAN:     return "SCAN";
     default:           return "OFF";
     }
 }
