@@ -190,6 +190,10 @@ INFO rows now: BG = FS type, root cluster, folder cluster (expect 000A0C32); BX 
 **Build 34 result (owner):** still no Blockz music. Tabled by the owner (2026-11-11). The MUSIC label and INFO BG/BX
 would say whether the walk failed (no 000A0C32 / no files) or the player start did (PLAY or ERR 2 with the right
 cluster); the second matters for M3U playlists, which start songs the same way.
+Owner's reading: MUSIC went SCAN, then PLAY, and nothing played. So the card walk found /_blockgame/ and its track,
+and the player thread is running (else ERR 2): the failure is in starting playback our way (record + ThreadCreate
+with arg {1, 0x46}), not in finding the file. Folders playback, which works, instead fills the record and does
+TaskSwitch(3, {index, 0x46}) so Now Playing's init starts the player.
 
 Earlier plan (superseded by the behaviour above):
 
