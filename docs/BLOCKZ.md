@@ -218,4 +218,5 @@ or more with music already playing when Blockz opened, before the track changes.
 music position, ratio 0.999; CK 1E847F 0BEBC200 07 = LOAD 1999999, clock variable 200 MHz, SysTick on. With music
 playing the game clock is right (and the timer counts frames at 60 per SysTick second, so it is right too).
 Remaining suspect: the CPU clock stock picks when nothing plays (a clock variable lower or higher than the real
-clock would make every tick short). Next: CK with nothing playing, and the timer against a watch in both states.
+clock would make every tick short). **Closed (build 33):** owner timed 20 s = 20 s against a phone; the earlier
+report was from build 28.
