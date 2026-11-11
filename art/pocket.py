@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SchalaOS "Pocket" look (owner, 2026-11-11; mockups https://claude.ai/artifact/2jDKSjE2kojxqMMU5mB4Nf):
+"""amuletOS "Pocket" look (owner, 2026-11-11; mockups https://claude.ai/artifact/2jDKSjE2kojxqMMU5mB4Nf):
 clean Game Boy Pocket style instead of the v0.1 pixel-art panels. White screen with a faint dot grid whose
 dots carry a very light rainbow (a still frame of the mockups' shimmer: stock screens only redraw on change),
 2 px ink frames, hard colour shadows, flat 16x16 icons, text in the device's own tall font.

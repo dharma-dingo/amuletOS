@@ -1,4 +1,4 @@
-"""SchalaOS tall UI font: original glyphs, caps 10 px tall, x-height 7, 2-row descenders.
+"""amuletOS tall UI font: original glyphs, caps 10 px tall, x-height 7, 2-row descenders.
 
 Each glyph is 12 rows (0-9 cap zone, 10-11 descender) of up to 7 columns, drawn with 1 px strokes;
 font.py applies the bold pass (vertical strokes become 2 px). Fills stock's 12 px font cell exactly

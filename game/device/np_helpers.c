@@ -50,14 +50,26 @@ void menu_np(void)
 #define REC     0x03022F14u
 #define TICK10  (*(volatile uint32_t *)0x0302288Cu)
 
-uint32_t pl_step(uint8_t *rec, int32_t dir)
+/* 1 while the music source record is on the playlist table's current entry (source 0x63, cluster and file number
+ * as in the table): the hook below and the player-init hooks (np_stub.S pl_init_count / pl_init_seek) act only
+ * then, so any other playback (Folders, library) runs stock's code. */
+uint32_t pl_active(void)
 {
     pl_table_t *t = (pl_table_t *)PLT_BASE;            /* the player thread is the only user while it runs */
+    uint16_t *r16 = (uint16_t *)REC;
+    uint32_t *r32 = (uint32_t *)REC;
+    uint32_t n = t->n, i = t->cur;
+    return t->magic == PLT_MAGIC && r16[0xF2 / 2] == 0x63 && i < n && n <= PLT_MAX
+        && r32[0x34 / 4] == t->clus[i] && r32[0x38 / 4] == t->num[i];
+}
+
+uint32_t pl_step(uint8_t *rec, int32_t dir)
+{
+    pl_table_t *t = (pl_table_t *)PLT_BASE;
     uint16_t *r16 = (uint16_t *)rec;
     uint32_t *r32 = (uint32_t *)rec;
+    if ((uint32_t)rec != REC || !dir || !pl_active()) return 0;
     uint32_t n = t->n, i = t->cur;
-    if ((uint32_t)rec != REC || !dir || t->magic != PLT_MAGIC || r16[0xF2 / 2] != 0x63
-        || i >= n || n > PLT_MAX || r32[0x34 / 4] != t->clus[i] || r32[0x38 / 4] != t->num[i]) return 0;
     if (r16[0x0C / 2] == 1 && n > 1) i += 1 + TICK10 % (n - 1);     /* shuffle: any other entry */
     else i += dir > 0 ? 1 : n - 1;
     if (i >= n) i -= n;

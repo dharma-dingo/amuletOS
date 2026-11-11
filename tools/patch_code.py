@@ -211,6 +211,11 @@ def playlists():
         (0, 0x0305E930, "2de9f84f", thumb_bw(0x0305E930, h["pl_step_hook"]).hex()),     # source step entry
         (22, 0x0308197E, "07b02846", thumb_bw(0x0308197E, h["pl_menu_exit"]).hex()),    # select routine exit
         (22, 0x0308165A, "082604462e70", "092604462e70"),                               # 9 items
+        # player thread init (build 36): while a playlist is active skip stock's Folders count / seek, which use the
+        # browser's stale folder state (build 35: endless Loading)
+        (33, 0x0308DF12, "b7f8f200632805d0", (thumb_bw(0x0308DF12, h["pl_init_count"]) + bytes.fromhex("00bf00bf")).hex()),
+        (33, 0x0308DFB8, "b7f8f200632818bf06281ad0",
+         (thumb_bw(0x0308DFB8, h["pl_init_seek"]) + bytes.fromhex("00bf") * 4).hex()),
     ]
 
 GENERATED = {"playlists": playlists, "menu_carousel": menu_carousel, "music_update": music_update, "np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}

@@ -1,4 +1,4 @@
-"""SchalaOS pixel-art helpers: Zeal palettes, original 5x7 font, 148x120 canvas.
+"""amuletOS pixel-art helpers: Zeal palettes, original 5x7 font, 148x120 canvas.
 
 Ported from the design mockups (claude.ai artifact "AP30 Screen Mockups").
 Everything is drawn on the native 148x120 grid and scaled 2x to 296x240.

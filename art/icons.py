@@ -1,4 +1,4 @@
-"""Original 24x24 SchalaOS menu icons, built from shapes with an automatic outline.
+"""Original 24x24 amuletOS menu icons, built from shapes with an automatic outline.
 
 Two sets: "classic" (Game Boy Color style symbols) and "relic" (Zeal artefacts).
 Each icon: a dict of named colour layers painted in order, then a 1 px outline.

@@ -1,4 +1,4 @@
-# SchalaOS handoff
+# amuletOS handoff (named SchalaOS until build 36)
 
 State of the project at the end of 2026-11-07. Read this first, then `README.md` (status
 checklist, release plan, decisions), `docs/HARDWARE.md` (every technical finding),
@@ -8,7 +8,7 @@ checklist, release plan, decisions), `docs/HARDWARE.md` (every technical finding
 
 ## 1. What it is, where things live
 
-**SchalaOS** is custom firmware for the **Hidizs AP30 Music Boy**: Rockchip RKNano (two
+**amuletOS** is custom firmware for the **Hidizs AP30 Music Boy**: Rockchip RKNano (two
 Cortex-M3 cores), CS43198 DAC, 296×240 RGB565 screen with rounded bezel corners, Game Boy-style
 controls (d-pad, A, B, Start, Select, a volume wheel, power). Theme: the Kingdom of Zeal colours
 (sky blue, cloud white, lavender, gold) in a Game Boy Color era style. Owner: Brett.
@@ -17,7 +17,7 @@ controls (d-pad, A, B, Start, Select, a volume wheel, power). Theme: the Kingdom
 |---|---|
 | Repo (local) | `C:\Users\Admin\claude\schala-os` (own git repo, branch `main`) |
 | Repo (remote) | github.com/dharma-dingo/schala-os (private). Repo-local identity `dharma-dingo` with a noreply email. |
-| Product spec | Notion → Retro Tech → "SchalaOS (AP30 Custom Firmware): Product Spec" (page 411894f1713a81338dcbdb2ae963ced5) |
+| Product spec | Notion → Retro Tech → "amuletOS (AP30 Custom Firmware): Product Spec" (page 411894f1713a81338dcbdb2ae963ced5) |
 | Design mockups | claude.ai artifact "AP30 Screen Mockups" (REib6hwrurHvLUW9jQSEuJ). The boot splash and icon art were ported from it. |
 | Stock firmware | `firmware/HIFIYF18.IMG` (V1.7.8). PC only, git-ignored, never commit or share. |
 | Device backup | `backup/` (476 MB flash dump, verified twice, SHA-256 in `backup/SHA256SUMS`). PC only. |
@@ -59,14 +59,15 @@ Always send `python tools/rkread.py td` before the first read in a session.
 | `tools/build_hook.py NAME STAMP16` | assembles `hooks/*.S`, stores it in the code.bin gap, points **module slot 2** at it, redirects a BL, packs + verifies |
 | `tools/imgres.py list/export/pack` | UI images (raw big-endian RGB565), byte-identical round trip |
 | `tools/build_reskin.py BASE ART STAMP16 --out DIR` | overlays `NNN.png` replacements onto BASE's images and packs |
-| `tools/inquiry.py D [--loop N --changes]` | live SCSI INQUIRY to the drive (reads D1 diagnostics, no admin) |
+| `tools/inquiry.py D [--loop N --changes]` | live SCSI INQUIRY to the drive, no admin: build 36+ answers `AMULETOS | AP30 | 0.3` (builds 13-35: D1 diagnostics, `SCHALAOS | clock adc adc | D1`); check it before copying an image |
 | `tools/fwmap.py`, `xref.py`, `fwdis.py` | function/string index, caller trees, annotated disassembly |
 
 **Rebuilding v0.1 from scratch:**
 
 ```
 python tools/ap30fw.py unpack firmware/HIFIYF18.IMG build/stock
-python tools/build_hook.py d1 2620071113000000            # build/d1 (stock + D1 hook)
+python tools/build_hook.py d1 2620071113000000            # build/d1 (stock + D1 hook; builds 13-35)
+python tools/build_hook.py amu 2620071136000000 --out build/amu   # build 36+: stock + amuletOS INQUIRY name (56 B)
 python tools/imgres.py export build/stock/images.bin build/img_stock
 python art/boot_splash.py build/art_v01
 python art/screens.py build/art_v01
@@ -79,11 +80,12 @@ python art/pocket.py build/art_pocket build/v029
 python art/recolor.py build/img_stock build/art_pocket build/art_pocket_auto pocket
 mkdir build/art_pocket_all; cp build/art_pocket_auto/*.png build/art_pocket/*.png build/art_pocket_all/; python art/boot_splash.py build/art_boot v0.3                  # boot/shutdown keep the v0.1 scene; version kept current
 cp build/art_boot/000.png build/art_boot/002.png build/art_pocket_all/
-python tools/build_helpers.py build/d1 build/d1h game/device/np_helpers.c game/device/np_stub.S game/device/libscan.c
+python tools/build_helpers.py build/amu build/d1h game/device/np_helpers.c game/device/np_stub.S game/device/libscan.c
 python tools/build_overlay.py build/d1h build/d1h_o game/device/npui.c --slot 28 --run 0x03083F0C --max 0x758 --at 0x5B400 --json npui.json
-python tools/patch_code.py build/d1h_o build/d1h_np np_v4,np_hide_format,menu_games_to_blockz,lib_skip,menu_carousel,music_update
+python tools/patch_code.py build/d1h_o build/d1h_np np_v4,np_hide_format,menu_games_to_blockz,lib_skip,menu_carousel,music_update,playlists
 python tools/build_module.py build/d1h_np build/d1h_np_bz game/device/blockz.c --at 0x58800
-python tools/build_reskin.py build/d1h_np_bz build/art_pocket_all 2620071132000000 --out build/v032 --font tall
+python tools/build_module.py build/d1h_np_bz build/d1h_np_bz_pl game/device/playlists.c --module 86 --in-place --desc pl_desc --data-max 0xD00
+python tools/build_reskin.py build/d1h_np_bz_pl build/art_pocket_all 26200711NN000000 --out build/v0NN --font tall
 ```
 
 ---
@@ -187,7 +189,8 @@ been on an August build).
 | 32 | …32 | Blockz crash fixes (suspected causes, both from build 29): the INFO clock check read the play-state pointer 0x030483D0 at open, which lives in the music engine's RAM (module 33 ZI) and is garbage when nothing has played since boot: now read only while the player runs and only if it points into RAM; the library fallback read up to all ~8400 records in one call (seconds blocked): now 24 records per service call in the background (MUSIC panel SCAN). Boot splash shows v0.3 | built; code diff vs 31 = Blockz only, images vs 30 = 000 only; not on device |
 | 33 | …33 | Main menu (owner): fresh boot starts on Music, not Now Playing; the Now Playing card is greyed out and does nothing while the player thread is not running (stock's Now Playing opened on an empty record and showed an error). `menu_art` (slot 2) swaps module 21's tile-table image ids in RAM (0x03023B64 + 8k + 4) at menu entry: greyed cards 8 / 20 / 24 (`art/pocket.py GREY_STATES`) for 16 / 14 / 22; `menu_np` = the Now Playing tile action. Slot 2 was 44 B over: the unused v0.2 Now Playing helpers (np_v2 / np_v3) were removed (in git up to e86d06a). Includes build 32 | built; code diff vs 32 only at the slot-2 call sites (moved helpers) plus menu sites; images vs 32 = 008, 020, 024 only; copied to device (hash verified; build 32 never went on). Owner: no Blockz crash with or without music; MUSIC ON with music playing; timer right (20 s = 20 s against a phone; TM ratio 0.999); no library rebuild after a power cycle (scan skip confirmed); Blockz own music: EMPTY |
 | 34 | …34 | **Blockz music:** owner's SD card checked on the PC: `/_blockgame/` = cluster 0x000A0C32 (Windows LCN 0xA0C30), one file (Classic Theme.mp3). Stock's folder iterator gave the root's directory info, so the count and the library search found nothing (EMPTY); `bgmusic.c` now walks the exFAT card itself with the scan skip's raw sector read (root -> "_blockgame" entry set -> first cluster -> files with an extension in stock's audio filter), 4 sectors per service call (SCAN); library-database search removed; host test `game/test/test_bgwalk.c`. **Now Playing (owner photo of 33):** stock's three 128 px info-line clears (image 69 at x 168, y 91/112/133) ran past the right panel's border (white bars): first one now `np_clear_info` (panel text area), the other two removed; frames get 8 px rounded corners (`art/pocket.py R_NP`); bottom band in from the screen's round bottom corners (x 21..274, title/times/bar follow). **Music menu icons** from the mockup (8x8 glyphs, 2x, item colours; normal set 227-235, highlighted +10); Favorites gets the heart (234), Update refresh arrows (235). Includes build 33 | built; walk host test passes; code diff vs 33 = slot-2 table (2 icon ids), m27 call sites (overlay grew), m28, m82; images vs 33 = 026, list icons only; copied to device (hash verified). Owner: Blockz own music still does not start (tabled for now) |
-| 35 | …35 | **M3U playlists:** Music menu row "Playlists" (9th entry, text 86, action 0x50: m22 select exit 0x0308197E -> `pl_menu_exit`, TaskSwitch(19)) opens the **Playlists screen = module 86** (task 19, a stock game nobody reaches; installed in place: `build_module.py --module 86 --in-place --desc pl_desc --data-max 0xD00`; `game/device/playlists.c` + `exfat.c` + `pl_core.c`): lists `/_Playlists/*.m3u*`, A resolves the entries (folder cluster + directory slot + 1) into the slot-2 table (`pl_table.h`, 0x0309FF28, 24 entries) and starts entry 1 like Folders (record source 0x63, TaskSwitch(3, {1, 0x46, 0x504C})). Song changes: 0x0305E930's entry -> `pl_step_hook` / `pl_step` (np_helpers.c): while the record is on the table's current entry, Next / Prev / track end (and shuffle) move along the table. Slot 2 is now full (20 B spare). **Blockz music, second attempt:** tracks of /_blockgame/ by directory slot into the same table, shuffled; start copies Now Playing's init including `*(u8 *)0x030483C8 = 1` (missing in 25-34); the player moves on by itself; reshuffle when it stops. Host tests `test_playlists.c` (simulated card), `test_bgwalk.c` (slots); `game/pc/pl_card.c` + `tools/pl_truth.py` check the resolver on the real card: all 16 playlists, 215 of 215 entries resolved, identical to the independent reader; 257..1376 sector reads per playlist (sets the "Loading" time on the device) | built; code diff vs 34 = hook sites, moved slot-2 call sites, m2, m82, m86; images vs 34 = 236, 246 only; copied to device (hash verified) |
+| 35 | …35 | **M3U playlists:** Music menu row "Playlists" (9th entry, text 86, action 0x50: m22 select exit 0x0308197E -> `pl_menu_exit`, TaskSwitch(19)) opens the **Playlists screen = module 86** (task 19, a stock game nobody reaches; installed in place: `build_module.py --module 86 --in-place --desc pl_desc --data-max 0xD00`; `game/device/playlists.c` + `exfat.c` + `pl_core.c`): lists `/_Playlists/*.m3u*`, A resolves the entries (folder cluster + directory slot + 1) into the slot-2 table (`pl_table.h`, 0x0309FF28, 24 entries) and starts entry 1 like Folders (record source 0x63, TaskSwitch(3, {1, 0x46, 0x504C})). Song changes: 0x0305E930's entry -> `pl_step_hook` / `pl_step` (np_helpers.c): while the record is on the table's current entry, Next / Prev / track end (and shuffle) move along the table. Slot 2 is now full (20 B spare). **Blockz music, second attempt:** tracks of /_blockgame/ by directory slot into the same table, shuffled; start copies Now Playing's init including `*(u8 *)0x030483C8 = 1` (missing in 25-34); the player moves on by itself; reshuffle when it stops. Host tests `test_playlists.c` (simulated card), `test_bgwalk.c` (slots); `game/pc/pl_card.c` + `tools/pl_truth.py` check the resolver on the real card: all 16 playlists, 215 of 215 entries resolved, identical to the independent reader; 257..1376 sector reads per playlist (sets the "Loading" time on the device) | built; code diff vs 34 = hook sites, moved slot-2 call sites, m2, m82, m86; images vs 34 = 236, 246 only; copied to device (hash verified). Owner: picking a playlist loads forever (stuck in Loading, needs a power-off); Playlists screen black with white text, no icons |
+| 36 | …36 | **Playlist start fix:** the player thread's init (m33 0x0308DDD0), for source 0x63, sets the record total from 0x0308DD48(3) = TotalFiles(filter, 3) of the *current Folders folder* and seeks with 0x0305E85C(record, index, ...) (TotalFiles again, 0x0305AE16 card-wide index -> folder, FindNext to the file), overwriting cluster / file number; with the browser's state stale that hung (build 35) or played nothing (Blockz). Hooks at m33 0x0308DF12 (`pl_init_count`) and 0x0308DFB8 (`pl_init_seek`) skip both while `pl_active` (record on the playlist table's current entry). **Playlists screen** drawn with FillRect only (Pocket list layout, icon, text from the font bitmaps): stock image / text calls showed black in this game-task window. **amuletOS:** boot splash option A (name in new lowercase glyphs), the D1 diagnostics hook replaced by `hooks/amu_inq.S` (static INQUIRY "AMULETOS AP30 0.3", 56 B instead of 140; frees slot 2), new base `build/amu`, docs and code renamed. Slot 2: 16 B spare | built; host tests pass; code diff vs 35 = moved slot-2 call sites, m2, m33 (2 hooks), m86; images = 000, 002; not on device |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX

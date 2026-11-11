@@ -1,7 +1,7 @@
 # Blockz (v0.2) spec
 
 Blockz: our own falling-block game, replacing stock's block game (module 82). Gameplay feel inspired by
-Apotris, look inspired by Game Boy Color era menus (Tetris DX), in the SchalaOS palette.
+Apotris, look inspired by Game Boy Color era menus (Tetris DX), in the amuletOS palette.
 Original name, code and art; no third-party code (Apotris source is not public, so we design
 from its published mechanics and the public SRS guideline). First release: **Sprint 40 lines only.**
 

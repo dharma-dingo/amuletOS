@@ -112,3 +112,40 @@ pl_menu_exit:
     ldr     r2, =0x03081983         @ pop.w {r4-r11, pc}
     bx      r2
     .ltorg
+
+@ Player thread init (module 33, r7 = music source record). For source 0x63 stock counts the current Folders folder
+@ (0x0308DD48 -> record total) and seeks to the requested index (0x0305E85C -> record cluster / file number), which
+@ for a playlist (or Blockz) uses a stale browser state: hang or wrong file (build 35). While pl_active, skip both.
+@ 0x0308DF12, was "ldrh.w r0, [r7, #0xf2]; cmp r0, #0x63; beq 0x0308DF26":
+    .equ PL_COUNT_SKIP,  0x0308DF40
+    .equ PL_COUNT_STOCK, 0x0308DF26
+    .equ PL_CMP6,        0x0308DF1A
+    .equ PL_SEEK_SKIP,   0x0308E014
+    .equ PL_SEEK_STOCK,  0x0308DFFA
+    .equ PL_LIBRARY,     0x0308DFC4
+    .section .text.pl_init_count
+    .global pl_init_count
+    .thumb_func
+pl_init_count:
+    bl      pl_active
+    cbnz    r0, 1f
+    ldrh.w  r0, [r7, #0xf2]
+    cmp     r0, #0x63
+    beq.w   PL_COUNT_STOCK          @ stock: count
+    b.w     PL_CMP6                 @ stock: "cmp r0, #6" with r0 = source
+1:  b.w     PL_COUNT_SKIP           @ playlist: past the folder count
+
+@ 0x0308DFB8, was "ldrh.w r0, [r7, #0xf2]; cmp r0, #0x63; it ne; cmpne r0, #6; beq 0x0308DFFA":
+    .section .text.pl_init_seek
+    .global pl_init_seek
+    .thumb_func
+pl_init_seek:
+    bl      pl_active
+    cbnz    r0, 1f
+    ldrh.w  r0, [r7, #0xf2]
+    cmp     r0, #0x63
+    it      ne
+    cmpne   r0, #6
+    beq.w   PL_SEEK_STOCK           @ stock: seek
+    b.w     PL_LIBRARY              @ stock: library sources
+1:  b.w     PL_SEEK_SKIP            @ playlist: past the seek

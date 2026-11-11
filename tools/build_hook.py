@@ -34,6 +34,7 @@ HOOKS = {
     "h1":  ("h0_inquiry.S", "h0_send",  HOOK_RUN, 2,    0x03083978, 0x81750, 0x03081AA4),
     "h1a": ("h0a_pass.S",   "h0a_send", HOOK_RUN, 2,    0x03083978, 0x81750, 0x03081AA4),
     "d1":  ("d1_diag.S",    "d1_send",  HOOK_RUN, 2,    0x03083978, 0x81750, 0x03081AA4),
+    "amu": ("amu_inq.S",    "amu_send", HOOK_RUN, 2,    0x03083978, 0x81750, 0x03081AA4),  # build 36: name only
 }
 
 def bl_decode(hw, pc):

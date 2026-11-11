@@ -1,4 +1,4 @@
-/* Stock V1.7.8 firmware entry points used by SchalaOS modules (core A, module 0).
+/* Stock V1.7.8 firmware entry points used by amuletOS modules (core A, module 0).
  * Addresses are run addresses (Thumb bit added where called). See docs/HARDWARE.md. */
 #ifndef STOCK_H
 #define STOCK_H

@@ -1,4 +1,4 @@
-/* Minimal synchronous exFAT reader for SchalaOS modules (playlists.c; Blockz has its own incremental walk in
+/* Minimal synchronous exFAT reader for amuletOS modules (playlists.c; Blockz has its own incremental walk in
  * bgmusic.c). Reads 512-byte sectors through the stock raw read (0x03057CC8) using the volume info stock keeps
  * at 0x0307E710, as libscan.c does. Host tests (game/test/test_playlists.c, game/pc/pl_card.c) supply ReadSec
  * and the volume themselves (EXFAT_HOST).

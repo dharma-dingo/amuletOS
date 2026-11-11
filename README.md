@@ -1,6 +1,6 @@
-# SchalaOS
+# amuletOS
 
-Music-first replacement firmware for the Hidizs AP30 Music Boy, themed after Chrono Trigger's Zeal and Schala. Spec: Notion → Retro Tech → "SchalaOS (AP30 Custom Firmware): Product Spec".
+Music-first replacement firmware for the Hidizs AP30 Music Boy, themed after Chrono Trigger's Zeal and Schala. Spec: Notion → Retro Tech → "amuletOS (AP30 Custom Firmware): Product Spec".
 Design mockups: https://claude.ai/artifact/REib6hwrurHvLUW9jQSEuJ
 
 ## Layout
@@ -55,7 +55,7 @@ M1:
 - [x] D1 diagnostics (build 13): CPU clock 200 MHz (USB mode); all 8 ladder buttons measured; **simultaneous face-button presses impossible** (series ladder, lowest wins)
 - [ ] Play-path timing (next: owner's slow-motion video, then timestamp hooks)
 - [ ] Music-mode clock
-- Screen push time: **deferred to M2** (decided 2026-11-07), measured with SchalaOS's own display driver. Stock's real flush path is indirect; the module-0 blits 0x03064F70/0x03064FD4 have no callers and do not set the panel window
+- Screen push time: **deferred to M2** (decided 2026-11-07), measured with amuletOS's own display driver. Stock's real flush path is indirect; the module-0 blits 0x03064F70/0x03064FD4 have no callers and do not set the panel window
 - [ ] Power / battery / charging (read-only)
 - [ ] docs/HARDWARE.md
 
@@ -137,6 +137,12 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
      Now Playing starts any other playback (np_load sees an arg without our tag).
   File number semantics confirmed 2026-11-11 (HARDWARE.md: directory slot + 1, not a count).
   **Built in build 35** (HANDOFF row 35): playlists over 24 entries keep the first 24 (slot-2 room).
+- **Folders play start and Next (owner, 2026-11-11: "attack that issue in full"):** stock's player init walks the
+  whole card to turn the browser's card-wide index into a folder + file (HARDWARE.md "Player thread init"): the
+  ~3 s start, and Next / track end continue with the next file card-wide. Plan: at the Folders play request take
+  the folder cluster + file slot from the browser directly, skip the card-wide walk (as for playlists, build 36),
+  and step within the folder (Next / Prev / end by directory slot). Needs resident code for a folder walker:
+  slot 2 has 16 B left; find room (e.g. move libscan.c's build-time code out, or a resident area elsewhere).
 - **Resume from the Now Playing card (idea, 2026-11-11):** after a reboot, stock's Music-menu "Now playing" resumes the last song from the saved resume point (sys+0x64, HARDWARE.md main menu notes). The carousel card could do the same instead of staying grey; not built.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 

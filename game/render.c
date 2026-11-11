@@ -1,4 +1,4 @@
-/* SchalaOS Blockz renderer. Layout (native px, screen 296x240):
+/* amuletOS Blockz renderer. Layout (native px, screen 296x240):
  *   well 110x220 at (93,10), 11 px cells, framed
  *   left panels  x 10..85 : HOLD, TIME, LINES
  *   right panels x 210..285: NEXT, PIECES, PPS, BEST

@@ -1,4 +1,4 @@
-/* SchalaOS Now Playing, layout A (v0.3): drawing hooks for stock's Now Playing (module 27).
+/* amuletOS Now Playing, layout A (v0.3): drawing hooks for stock's Now Playing (module 27).
  *
  * Stock keeps all behaviour (keys, track changes, cover decode into the framebuffer at (17, 46), its
  * redraw messages); these functions replace what it draws in the right panel, the bottom band and the

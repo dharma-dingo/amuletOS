@@ -1,4 +1,4 @@
-/* SchalaOS Playlists screen (v0.3, build 35): module 86 (task 19, stock game slot nobody reaches), opened by the
+/* amuletOS Playlists screen (v0.3, build 35): module 86 (task 19, stock game slot nobody reaches), opened by the
  * Music menu's "Playlists" row (np_stub.S pl_menu_exit). Lists /_Playlists/*.m3u* on the SD card; A plays the
  * chosen playlist from track 1 in Now Playing; B goes back to the Music menu.
  *
@@ -23,7 +23,10 @@
 #define DiskSwitch(n)       STOCK_FN(0x03058526, void, uint32_t)(n)
 #define RecPrepare()        STOCK_FN(0x03055304, void, void)()
 #define SetFont(n)          STOCK_FN(0x030643A2, uint32_t, uint32_t)(n)
-#define DrawImage(i, x, y)  STOCK_FN(0x03064D20, void, uint32_t, int, int)(i, x, y)
+#define CharW(c)            STOCK_FN(0x03063BC6, uint32_t, uint32_t)(c)
+#define FontRead(o, b, n)   STOCK_FN(0x0306535C, void, uint32_t, void *, uint32_t)(o, b, n)
+#define FONTBASE            (*(volatile uint32_t *)0x03022868u)
+#define SPACING             (*(volatile int16_t *)0x03022E04u)
 #define S8(o)   (*(volatile uint8_t *)(SYSC + (o)))
 #define R16(o)  (*(volatile uint16_t *)(REC + (o)))
 #define R32(o)  (*(volatile uint32_t *)(REC + (o)))
@@ -38,11 +41,16 @@
 #define K_B     0x040
 #define K_A     0x080
 
-#define C_INK   RGB565(0x23, 0x25, 0x2e)
-#define C_DIM   RGB565(0x7d, 0x82, 0x91)
-#define IMG_BG  159             /* art/pocket.py list_bg: status band, header band 35..58, rows of 23 from 61 */
-#define IMG_SEL 184             /* selection bar 296 x 22 */
-#define IMG_ICON 236            /* playlist row icon; +10 = on the selection bar */
+/* Pocket list look (art/pocket.py list_bg / selection_bar), drawn with FillRect only: build 35 drew stock images
+ * and text, which showed black with white text in this game-task window (Blockz also draws only with fills). */
+#define C_INK    RGB565(0x23, 0x25, 0x2e)
+#define C_DIM    RGB565(0x7d, 0x82, 0x91)
+#define C_WHITE  RGB565(0xff, 0xff, 0xff)
+#define C_HEAD   RGB565(0xf2, 0xf3, 0xf6)
+#define C_TRACK  RGB565(0xdf, 0xe1, 0xe8)
+#define C_SCREEN RGB565(0xfb, 0xfb, 0xf8)
+#define C_TINT   RGB565(0xe9, 0xe3, 0xfb)
+#define C_GRAPE  RGB565(0x73, 0x53, 0xe0)
 #define ROW_Y   61
 #define ROW_H   23
 #define ROWS    7
@@ -57,7 +65,43 @@ static pl_list_t L;
 
 static void a16(uint16_t *d, const char *s) { while ((*d++ = (uint8_t)*s++)) {} }
 
-static void text(int x, int y, const uint16_t *s, uint16_t col) { COLOR = col; DrawText(x, y, s); }
+static void fill(int x0, int y0, int x1, int y1, uint16_t c) { COLOR = c; FillRect(x0, y0, x1, y1); }
+
+/* the device's 16 px font (SetFont(2)) read straight from its bitmaps, drawn as horizontal runs; stops at x_max */
+static void text(int x, int y, const uint16_t *s, uint16_t col, int x_max)
+{
+    SetFont(2);
+    uint32_t base = FONTBASE;
+    COLOR = col;
+    for (; *s; s++) {
+        int w = (int)CharW(*s) + SPACING;
+        if (x + w > x_max) break;
+        if (*s != ' ') {
+            uint8_t g[32];
+            FontRead(base + *s * 33u, g, 32);
+            for (int r = 0; r < 16; r++) {
+                uint32_t v = (uint32_t)g[2 * r] << 8 | g[2 * r + 1];
+                for (int c = 0; c < 16; ) {
+                    if (!(v & (0x8000u >> c))) { c++; continue; }
+                    int c0 = c;
+                    while (c < 16 && (v & (0x8000u >> c))) c++;
+                    FillRect(x + c0, y + r, x + c - 1, y + r);
+                }
+            }
+        }
+        x += w;
+    }
+}
+
+/* playlist row icon (art/pocket.py LIST_GLYPHS 236): 8 x 8 at 2x */
+static void icon(int x, int y)
+{
+    static const uint8_t rows[8] = { 0xDF, 0xDF, 0x00, 0xDF, 0xDF, 0x00, 0xDC, 0xDC };
+    COLOR = C_GRAPE;
+    for (int r = 0; r < 8; r++)
+        for (int c = 0; c < 8; c++)
+            if (rows[r] & (0x80 >> c)) FillRect(x + 2 * c, y + 2 * r, x + 2 * c + 1, y + 2 * r + 1);
+}
 
 static void redraw(void) { S.dirty = 1; SendMsg(MSG_DRAW); }
 
@@ -147,33 +191,37 @@ static void paint(void)
     if (!GetMsg(MSG_DRAW) && !S.dirty) return;
     S.dirty = 0;
     uint16_t old = COLOR;
-    uint32_t font = SetFont(2);
-    static uint16_t b[32];
-    DrawImage(IMG_BG, 0, 0);
+    static uint16_t b[40];
+    fill(0, 0, 295, 32, C_WHITE);                          /* status band */
+    fill(0, 33, 295, 34, C_INK);
+    fill(0, 35, 295, 58, C_HEAD);                          /* header */
+    fill(0, 59, 295, 60, C_INK);
+    fill(0, 221, 295, 222, C_INK);
+    fill(0, 223, 295, 239, C_SCREEN);
     a16(b, "Playlists");
-    text(12, 39, b, C_INK);
+    text(12, 39, b, C_INK, 200);
     const char *msg = 0;
     switch (S.state) {
     case ST_NOCARD:   msg = "No SD card"; break;
     case ST_NODIR:    msg = "No _Playlists folder"; break;
     case ST_EMPTY:    msg = "No playlists"; break;
     }
-    if (msg) { a16(b, msg); text(40, ROW_Y + 3, b, C_DIM); }
-    else {
-        for (int r = 0; r < ROWS && S.top + r < L.count; r++) {
-            int i = S.top + r, y = ROW_Y + r * ROW_H, on = i == S.sel;
-            if (on) DrawImage(IMG_SEL, 0, y);
-            DrawImage(IMG_ICON + (on ? 10 : 0), 8, y - 1);
-            const pl_file_t *f = &L.files[i];
-            int n = f->nlen < 31 ? f->nlen : 31;
-            for (int c = 0; c < n; c++) b[c] = f->name[c];
-            b[n] = 0;
-            text(40, y + 3, b, C_INK);
-        }
-        if (S.state == ST_LOAD) { a16(b, "Loading"); text(210, 39, b, C_DIM); }
-        if (S.state == ST_NOTRACKS) { a16(b, "No tracks found"); text(150, 39, b, C_DIM); }
+    if (S.state == ST_LOAD)     { a16(b, "Loading"); text(220, 39, b, C_DIM, 292); }
+    if (S.state == ST_NOTRACKS) { a16(b, "No tracks"); text(206, 39, b, C_DIM, 292); }
+    for (int r = 0; r < ROWS; r++) {
+        int i = S.top + r, y = ROW_Y + r * ROW_H, on = !msg && i == S.sel && i < L.count;
+        fill(0, y, 295, y + 21, on ? C_TINT : C_WHITE);
+        if (on) fill(0, y, 3, y + 21, C_GRAPE);
+        fill(0, y + 22, 295, y + 22, r == ROWS - 1 ? C_WHITE : C_TRACK);
+        if (msg) { if (r == 0) { a16(b, msg); text(40, y + 3, b, C_DIM, 292); } continue; }
+        if (i >= L.count) continue;
+        icon(12, y + 3);
+        const pl_file_t *f = &L.files[i];
+        int n = f->nlen < 39 ? f->nlen : 39;
+        for (int c = 0; c < n; c++) b[c] = f->name[c];
+        b[n] = 0;
+        text(40, y + 3, b, C_INK, 290);
     }
-    SetFont(font);
     COLOR = old;
 }
 

@@ -1,4 +1,4 @@
-/* SchalaOS Blockz core. See core.h and docs/BLOCKZ.md.
+/* amuletOS Blockz core. See core.h and docs/BLOCKZ.md.
  * Rules: guideline SRS (kicks from tetris.wiki), 7-bag, hold, ghost, lock delay with
  * move reset, DAS/ARR/soft drop in half-frames, Sprint 40 lines, no line-clear delay. */
 #include "core.h"

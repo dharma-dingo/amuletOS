@@ -1,4 +1,4 @@
-/* SchalaOS Blockz renderer: draws a bg_game_t into an RGB565 framebuffer
+/* amuletOS Blockz renderer: draws a bg_game_t into an RGB565 framebuffer
  * (296x240), redrawing only what changed since the last call. Freestanding C. */
 #ifndef BG_RENDER_H
 #define BG_RENDER_H

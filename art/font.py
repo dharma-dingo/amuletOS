@@ -1,4 +1,4 @@
-"""SchalaOS UI font for stock's text renderer (font0 = 12 px, font1 = 16 px sections).
+"""amuletOS UI font for stock's text renderer (font0 = 12 px, font1 = 16 px sections).
 
 Original glyphs on a 5x8 art grid: capitals and digits from zeal.py (rows 0-6), lower case with
 x-height 5 and a 1-row descender (row 7). Encodes them into stock's records (docs/HARDWARE.md, Fonts):

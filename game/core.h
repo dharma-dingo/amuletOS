@@ -1,4 +1,4 @@
-/* SchalaOS Blockz core: portable, freestanding C (no libc), deterministic.
+/* amuletOS Blockz core: portable, freestanding C (no libc), deterministic.
  * Driven by one input bitmask per frame (60 fps). Used by the device module,
  * the unit tests and the PC preview. Spec: docs/BLOCKZ.md. */
 #ifndef BG_CORE_H

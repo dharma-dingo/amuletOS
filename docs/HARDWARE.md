@@ -1,4 +1,4 @@
-# SchalaOS hardware notes (AP30, stock V1.7.8)
+# amuletOS hardware notes (AP30, stock V1.7.8)
 
 Toolchain: Arm GNU Toolchain 13.3.Rel1 (arm-none-eabi-gcc 13.3.1), installed at
 `C:\Users\Admin\tools\arm-gnu-toolchain\arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\bin`
@@ -42,7 +42,7 @@ That leaves ~2.7 s unexplained. Suspects: overlay loads from flash (music + deco
 and its handshakes, file open / tag parsing, library DB work. Next: owner's slow-motion video to split the 3 s,
 then trace the overlay loader and the core B handshake.
 
-**SchalaOS design consequence:** keep the DAC/amp powered while the UI is awake, keep the music path resident
+**amuletOS design consequence:** keep the DAC/amp powered while the UI is awake, keep the music path resident
 (no overlay swap on play), and never busy-wait on the UI core.
 
 ## Peripheral map (SDK hw_memap.h, confirmed by firmware use)
@@ -93,7 +93,7 @@ Plus one key on **GPIO2 pin 5** (code 0x001), checked first.
 | B | not measured (exits USB mode); by elimination | 0x040 |
 | A | 854–855 | 0x080 |
 
-Start and A sit at stock's band edges; SchalaOS should use midpoints between measured values. The volume wheel does not touch ch1.
+Start and A sit at stock's band edges; amuletOS should use midpoints between measured values. The volume wheel does not touch ch1.
 
 **Simultaneous face-button presses cannot be read (confirmed).** Every pair reads as its lower-value member: Up+A → Up, Right+A → Right, Left+Select → Left, Up+Right → Right, Down+Start → Down, Select+Start → Select. Series ladder: priority Right > Up > Left > Down > Select > Start > B > A, so A is masked by any other face button. Inputs that can combine with a face button: the volume wheel (GPIO encoder) and the GPIO2 pin 5 key.
 
@@ -113,7 +113,7 @@ Stock key timing (SDK AD_Key): 2-tick debounce, repeat after 20 ticks, then ever
 - Panel: **296×240, RGB565**, mounted rotated (the window code mirrors x: 295 − x).
 - Stock draws into a **RAM framebuffer at 0x03006688** (row stride 592 bytes; pages of 190 rows plus a second path for the rest; double-buffer page select). Pixel write 0x03064DC4, software window/rotation 0x03064EA8.
 - Frames reach the panel by **DMA into the LCD data FIFO at 0x6009000C** (LCD controller base 0x60090000, control at +4; 0x0E written before some transfers). Rectangle blits: 0x03064F70 / 0x03064FD4 (window, get DMA channel 0x030614F8, start DMA 0x03061524 with w×h/2 words).
-- Stock "clear screen" (0x03064F2A) writes all 71,040 pixels one at a time through the CPU. Wasteful; SchalaOS should fill by DMA.
+- Stock "clear screen" (0x03064F2A) writes all 71,040 pixels one at a time through the CPU. Wasteful; amuletOS should fill by DMA.
 - The panel driver is **chosen at boot from a table in flash** (`LcdDriverIndex`, LcdInterface.c, module 1 0x03081CC0): its function table is copied to 0x0306FD14 and `ops[1]` (init) is called. The panel's command sequence lives in that flash table, not in the code modules. Controller model not yet identified.
 - 0x60070000 (SDK "VOP") is used as per-channel registers (channel × 0x34), more like a DMA engine than display timing.
 - **Open (deferred to M2):** bus speed and full-frame push time. Stock's blit routines 0x03064F70 / 0x03064FD4 have no direct callers or stored pointers anywhere in the image, and their window routine 0x03064EA8 only updates software state (no panel command), so the live flush goes through an untraced indirect path (likely the panel-driver table from flash). DMA: DesignWare-style DMAC at 0x60000000 (ChEnReg +0x3A0, channels 0–4, allocator 0x030614F8), linked-list start 0x03061524 with up to 18 blocks of 0xFF8 words, descriptors at 0x03005AD4 + ch×0x1B0. **Correction:** SysTick is stock's system tick: 0x030621C8(ms) sets LOAD = clk * ms / 1000 - 1 and stock calls it with 10 (boot and after clock changes), the SysTick ISR (0x03067470) walks a callback list whose first entry increments the 10 ms counter at 0x0302288C. Sub-tick time: (LOAD - VAL) / (LOAD + 1) of 10 ms, clock-independent (used by Blockz for 60 fps pacing).
@@ -178,9 +178,9 @@ out text wider than its current advances (clipping or scrolling).
 - **Overlay data window:** every UI / game module's data + ZI start at 0x03023B48; stock module 98 uses 0xD12 B
   (data 0x64 + ZI 0xCAE), so at least that much is free for whichever module runs. Task -> module table at
   code.bin 0x5D410 (u32 per task): 0 m21, 1 m22, 2 m23, 3 m27, 4 m13, 5 m28, 6 m17, 7 m29, 8 m30, 9 m31, 10 m32,
-  11 m9, 12 m6, 13 m5, 14..42 m81..m109 (task 19 = m86, the largest stock game, 13.8 KB: SchalaOS Playlists).
-- **Slot-2 RAM (build 35):** 0x0309F800 D1 hook, 0x0309F88C.. helpers (np_helpers.c, np_stub.S, libscan.c; end
-  0x0309FF14), 0x0309FF28 playlist table (pl_table.h, 152 B), 0x0309FFC0 libscan FP, 0x0309FFD8 npui scroll,
+  11 m9, 12 m6, 13 m5, 14..42 m81..m109 (task 19 = m86, the largest stock game, 13.8 KB: amuletOS Playlists).
+- **Slot-2 RAM (build 36):** 0x0309F800 amuletOS INQUIRY hook (56 B; D1 diagnostics 0x8C B until build 35),
+  0x0309F838.. helpers (np_helpers.c, np_stub.S, libscan.c; end 0x0309FF18), 0x0309FF28 playlist table (pl_table.h, 152 B), 0x0309FFC0 libscan FP, 0x0309FFD8 npui scroll,
   0x0309FFE4 carousel index, 0x0309FFF0 stock reset magic.
 - **Slot 2 is resident:** module 1 loads slot 2 (type 7) at boot while reading the system config
   (0x030827B0), and no module runs above 0x0309F7CC, so code linked into slot 2 at 0x0309F800 stays loaded.
@@ -282,6 +282,20 @@ out text wider than its current advances (clipping or scrolling).
   0x03081774(arg) = if the player thread is not running: ThreadDelete(0x030232BC), ModuleOverlay(33, 7),
   ThreadCreate(0x030232BC, 0x030361A4, arg); then **0x0308CFB8(1) = `*(u8 *)0x030483C8 = 1`** (first byte of the
   engine's state, m33 ZI). Blockz's own start (builds 25-34) skips that store: likely why it played nothing.
+- **Player thread init (m33 0x0308DDD0, descriptor 0x030361A4 = {0, 0, init 0x0308DDD1, main 0x0308E179, deinit
+  0x0308E799})**: arg[0] -> sys+0x5E (index); source 0x63: 0x0308DD48(3) = record total from 0x0305ADA8(filter, 3)
+  (TotalFiles over the browser's current folder state 0x030056C0; 0 -> disk switching, msg 0xEE); then (0x63 or 6)
+  0x0305E85C(record, sys+0x5E, mode, shuffle, filter): TotalFiles again, record+2 = index, 0x0305AE16(index, ...)
+  (card-wide index -> folder: walks the card), 0x0305BD30 FindFirst + 0x0305BD04 FindNext up to the file -> record
+  +0x34 / +0x38; mode 2 (play modes 0..2) keeps the index within the folder. Other sources skip both (library
+  path: record+0xC = sys+0x67, +0x10 = 0x03005716). **This card-wide walk is the ~3 s Folders play start and why
+  Next from Folders goes to an unrelated song.** Build 36 skips it for playlists (np_stub.S pl_init_count /
+  pl_init_seek).
+- Source-type branches (all `record+0xF2` reads): m0 RecPrepare (7), step 0x0305E930 (0x63 / 6 / 3 / 0..2),
+  m22 / m23 (6), m27 0x03081F20 (non-0x63: tags from the library DB), 0x030824E8 / 0x030838E4 (Back: 0x63 -> browser,
+  else Music menu with the list type), m31 (0x63 / 6), m33 init (above) and main 0x0308E3C6, m34 open type
+  (6 -> 1 else 3), 0x0308FA16 (DB tags only when record+0x44 != 0), 0x0308FE9E. A new source value would take the
+  library paths, so playlists keep 0x63.
 - **File number = directory entry slot + 1** (checked 2026-11-11 on the owner's card, read raw on the PC): the
   record's +0x38 (and library DB record +4) is the 32-byte slot index of the file's 0x85 entry in its folder, plus
   1, counting deleted entries too; the open (0x030598E6, "clus = %d, index = %d") takes +0x38 - 1. Owner's card:
