@@ -70,11 +70,25 @@ def screen(cv, y0=0, y1=H):
         for x in range(3, W, 8):
             cv.rect(x, y, 2, 2, mix(DOT, rainbow((x + y) / 220), 0.32))
 
-def frame(cv, x, y, w, h, fill=WHITE, shadow=None):
+def corner_inset(r, i):
+    """pixels left out at the start of row i (0 = outermost) of a quarter circle of radius r"""
+    if r <= 0 or i >= r: return 0
+    dy = r - i - 0.5
+    return max(0, int(r - (r * r - dy * dy) ** 0.5 + 0.5))
+
+def rrect(cv, x, y, w, h, r, c):
+    if r <= 0:
+        cv.rect(x, y, w, h, c); return
+    for i in range(h):
+        k = corner_inset(r, min(i, h - 1 - i))
+        cv.rect(x + k, y + i, w - 2 * k, 1, c)
+
+def frame(cv, x, y, w, h, fill=WHITE, shadow=None, r=0):
+    """2 px ink outline; r: corner radius (owner build 34: Now Playing outlines rounded like the screen)"""
     if shadow:
-        cv.rect(x + 4, y + 4, w, h, shadow)
-    cv.rect(x, y, w, h, INK)
-    cv.rect(x + 2, y + 2, w - 4, h - 4, fill)
+        rrect(cv, x + 4, y + 4, w, h, r, shadow)
+    rrect(cv, x, y, w, h, r, INK)
+    rrect(cv, x + 2, y + 2, w - 4, h - 4, max(0, r - 2), fill)
 
 def status(cv, h=32):
     """plain white status band (stock draws its icons and our counter on it) with a 2 px ink rule"""
@@ -157,14 +171,16 @@ def menu_card(sel, np_off=False):
 
 # ---------- Now Playing (026) and its cover placeholder (277) ----------
 # geometry shared with game/device/npui.c (cover is stock's 116x116 at (17, 46))
+R_NP = 8                                               # Now Playing frame corner radius
+
 def now_playing():
     cv = Canvas(W, H)
     screen(cv, 34)
     status(cv)
-    frame(cv, 13, 42, 124, 124, WHITE, GRAPE)          # cover frame: 2 px ink, 2 px white, cover 17..132 / 46..161
-    frame(cv, 146, 42, 138, 124)                       # artist / album: text x 154..278
-    frame(cv, 13, 174, 270, 56)                        # title, bar, times: fill x 15..280, y 176..227
-    return cv
+    frame(cv, 13, 42, 124, 124, WHITE, GRAPE, R_NP)    # cover frame: 2 px ink, 2 px white, cover 17..132 / 46..161
+    frame(cv, 146, 42, 138, 124, r=R_NP)               # artist / album: text x 154..278
+    frame(cv, 21, 172, 254, 58, r=R_NP)                # title, bar, times: fill x 23..272, y 174..227 (build 34:
+    return cv                                          #  in from the screen's round bottom corners)
 
 def default_art():
     cv = Canvas(116, 116)
@@ -267,6 +283,36 @@ def lighten_icon(a, n):
     out = np.array(tile, float)[None, None, :] * (1 - alpha[..., None]) + np.array(col, float)[None, None, :] * alpha[..., None]
     return np.clip(out, 0, 255).astype(np.uint8)
 
+# ---------- Music menu row icons (mockup MusicList: 8x8 glyphs, 2x, one colour per item) ----------
+LIST_GLYPHS = {   # stock id (normal set; +10 = the highlighted set): glyph, colour
+    227: (["kk......", "kkkk....", "kkkkkk..", "kkkkkkkk", "kkkkkkkk", "kkkkkk..", "kkkk....", "kk......"], GRAPE),  # Now playing
+    228: (["....kk..", "....kkk.", "....k.kk", "....k..k", "....k...", ".kkkk...", "kkkkk...", ".kkk...."], SKY),    # All Music
+    229: (["..kkkk..", "..kkkk..", "..kkkk..", "...kk...", ".kkkkkk.", "kkkkkkkk", "kkkkkkkk", "kkkkkkkk"], BERRY),  # Artist
+    230: (["..kkkk..", ".kkkkkk.", "kkk..kkk", "kk.kk.kk", "kk.kk.kk", "kkk..kkk", ".kkkkkk.", "..kkkk.."], TEAL),   # Album
+    231: (["kkkk....", "kkkkk...", "kk.kkk..", "kkkkkkk.", ".kkkkkkk", "..kkkkk.", "...kkk..", "....k..."], "#d99a10"),  # Genre
+    232: (["kkk.....", "kkkkkkkk", "k......k", "k......k", "k......k", "k......k", "kkkkkkkk", "........"], KIWI),   # Directory
+    234: ([".kk..kk.", "kkkkkkkk", "kkkkkkkk", "kkkkkkkk", ".kkkkkk.", "..kkkk..", "...kk...", "........"], BERRY),  # Favorites
+    235: (["..kkkkk.", ".k....kk", "k....kkk", "k.......", ".......k", "kkk....k", "kk....k.", ".kkkkk.."], INK),    # Update
+}
+
+def list_icons():
+    """24x24 row icons: glyph in the item colour on white, and on the selection tint for the highlighted set"""
+    out = {}
+    for n, (rows, col) in LIST_GLYPHS.items():
+        for m, tile in ((n, WHITE), (n + 10, TINT)):
+            cv = Canvas(24, 24); cv.rect(0, 0, 24, 24, tile)
+            for r, row in enumerate(rows):
+                for c, ch in enumerate(row):
+                    if ch == "k": cv.rect(4 + c * 2, 4 + r * 2, 2, 2, col)
+            out[m] = cv
+    rows = LIST_GLYPHS[232][0]                             # blue set folder (stock's is a filled tile)
+    cv = Canvas(24, 24); cv.rect(0, 0, 24, 24, WHITE)
+    for r, row in enumerate(rows):
+        for c, ch in enumerate(row):
+            if ch == "k": cv.rect(4 + c * 2, 4 + r * 2, 2, 2, SKY)
+    out[222] = cv
+    return out
+
 def dark_icons(stock):
     """small stock images (<= 40 px) drawn on a dark tile, except pure-black colour keys"""
     for f in sorted(os.listdir(stock)):
@@ -297,12 +343,7 @@ def main():
     for lv, i in enumerate((4, 5, 6, 7)):
         save(charging(lv), i)
     save(dac_screen(), 17); save(updating(), 437)
-    folder = ["kkk.....", "kkkkkkkk", "k......k", "k......k", "k......k", "k......k", "kkkkkkkk", "........"]
-    for n, col, tile in ((222, SKY, WHITE), (232, INK, WHITE), (242, GRAPE, TINT)):  # stock's is a filled tile
-        cv = Canvas(24, 24); cv.rect(0, 0, 24, 24, tile)
-        for r, row in enumerate(folder):
-            for c, ch in enumerate(row):
-                if ch == "k": cv.rect(4 + c * 2, 5 + r * 2, 2, 2, col)
+    for n, cv in list_icons().items():                     # Music menu rows (mockup MusicList)
         save(cv, n)
     k = 0
     for n, a in dark_icons(stock):

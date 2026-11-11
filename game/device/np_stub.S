@@ -58,8 +58,8 @@ music_menu:
     .hword 0xE6, 0x54, 3      @ Album
     .hword 0xE7, 0x55, 4      @ Genre
     .hword 0xE8, 0x57, 6      @ Directory List
-    .hword 0xE8, 0x59, 7      @ Favorites
-    .hword 0xE8, 0x5A, 8      @ Update
+    .hword 0xEA, 0x59, 7      @ Favorites (heart, build 34; stock used the folder)
+    .hword 0xEB, 0x5A, 8      @ Update (refresh arrows, build 34)
 
 @ main menu key dispatch fallthrough (module 21 0x03081B8A, was "b.w exit"): r1 = event - 0x40000010.
 @ Start press (0x40000100, r1 = 0xF0) -> the Settings code at 0x03081BA6 (menu_carousel); anything else -> exit.

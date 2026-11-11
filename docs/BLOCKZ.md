@@ -178,6 +178,15 @@ Exit: ThreadDelete. Status in the MUSIC panel: ON, PLAY, NO SD, NO DIR, EMPTY, E
 did not start or stopped). INFO page lines BG (FS type, root, cluster from entry) and BX (cluster from exFAT info,
 file count, current file) - expected cluster on the owner's card: 000A0C32.
 
+**Build 34:** builds 25-33 showed EMPTY: the folder was found by name, but the iterator's directory info is the
+root's, so the file count (and the build 29-33 library-database fallback, matching on that cluster) found nothing.
+Now `bgmusic.c` reads the exFAT card itself (raw sector read 0x03057CC8, volume info 0x0307E710 as in libscan.c):
+root directory (FAT chain) -> the "_blockgame" folder entry set (name case-insensitive) -> its first cluster
+(contiguous or chained) -> count files whose extension's first three letters are in stock's filter
+"MP1MP2MP3WMAWAVAPEFLAAACM4AOGGMP43GPDFFDSF"; tracks are numbered 1.. in folder order (assumed to match the
+player's file number; true for the owner's one-file folder). FAT cards keep the old iterator path (untested).
+INFO rows now: BG = FS type, root cluster, folder cluster (expect 000A0C32); BX = sectors read, files, track.
+
 Earlier plan (superseded by the behaviour above):
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays

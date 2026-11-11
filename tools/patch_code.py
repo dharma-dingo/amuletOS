@@ -146,6 +146,9 @@ def np_v4():
         (27, 0x03082A90, "b1f85a13", "b1f85c12"),                                          # line 3 source: album
         (27, 0x03082AC6, "e1f756fa", thumb_bl(0x03082AC6, u["np_album"]).hex()),          # line 3 draw: album
         (27, 0x03082AE0, "e1f7defc", thumb_bl(0x03082AE0, u["np_clear_artist"]).hex()),   # line 1 empty: clear
+        (27, 0x030829B2, "e1f79bff", thumb_bl(0x030829B2, u["np_clear_info"]).hex()),     # stock line clears ran
+        (27, 0x030829BC, "e1f796ff", NOP2),                                                # past the panel border
+        (27, 0x030829C6, "e1f791ff", NOP2),                                                # (build 34)
         (27, 0x03082B04, "e1f7ccfc", NOP2),                                                # line 3 empty fallback
         (27, 0x0308344C, "adf80840adf80c90adf80a50adf80e60ac2200211c20e1f75dfc02a9a8f800400223384a0846e0f780fd3fe0",
          region(0x0308344C, 0x03083478, "np_title_new", 0x030834F8)),                     # title line, mode 1

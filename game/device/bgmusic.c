@@ -11,7 +11,9 @@
 #define PREC   0x03022F14u      /* music source record */
 #define PHAND  0x030232BCu      /* player thread handle */
 #define PDESC  0x030361A4u      /* player thread descriptor (module 33) */
+#ifndef BGWALK_HOST
 #define FILTER ((const void *)0x030056EBu)   /* "MP1MP2MP3WMA..." audio extension list */
+#endif
 #define FTYPE  6u               /* entry type the library scanner uses */
 
 #define ThreadRunning(h, d)  STOCK_FN(0x03057C7C, uint32_t, uint32_t, uint32_t)(h, d)
@@ -21,20 +23,14 @@
 #define DiskSwitch(d)        STOCK_FN(0x03058526, void, uint32_t)(d)
 #define FindFirst(f, it, e, t) STOCK_FN(0x0305BBF6, uint32_t, void *, void *, const void *, uint32_t)(f, it, e, t)
 #define FindNext(f, it, e, t)  STOCK_FN(0x0305BBCA, uint32_t, void *, void *, const void *, uint32_t)(f, it, e, t)
-#define ExName(x, i, t, o)   STOCK_FN(0x0305B2D0, uint32_t, void *, uint32_t, uint32_t, uint16_t *)(x, i, t, o)
 #define FatName(c, i, t, o)  STOCK_FN(0x0305C364, uint32_t, uint32_t, uint32_t, uint32_t, uint16_t *)(c, i, t, o)
-#define ExFiles(x, e, t)     STOCK_FN(0x0305BF7E, uint32_t, void *, const void *, uint32_t)(x, e, t)
-#define ExDirs(x, t)         STOCK_FN(0x0305A79E, uint32_t, void *, uint32_t)(x, t)
 #define FatFiles(c, e, t)    STOCK_FN(0x0305BDF6, uint32_t, uint32_t, const void *, uint32_t)(c, e, t)
 #define FatDirs(c, t)        STOCK_FN(0x0305A6B4, uint32_t, uint32_t, uint32_t)(c, t)
 #define RecPrepare()         STOCK_FN(0x03055304, void, void)()
 #define AudioClose()         STOCK_FN(0x0308D86E, void, uint32_t)(1)
 #define AudioControl(c, a)   STOCK_FN(0x0308BF84, uint32_t, uint32_t, uint32_t)(c, a)
-#define FlashRead(o, n, b)   STOCK_FN(0x03068194, uint32_t, uint32_t, uint32_t, uint32_t, void *)(0x30001, o, n, b)
-#define MAX_TRACKS 64
 
 enum { BGM_OFF, BGM_KEPT, BGM_NOCARD, BGM_NOFOLDER, BGM_NOFILE, BGM_PLAY, BGM_ERRFIND, BGM_ERRSTART, BGM_SCAN };
-#define SCAN_STEP 24         /* library records read per service call (build 31 read all ~8400 at once and froze) */
 
 typedef struct {                 /* the browser's iterator (BrowserUI listing, sp+0 .. sp+0x47) */
     uint32_t clus, index, count;
@@ -45,11 +41,7 @@ typedef struct {                 /* the browser's iterator (BrowserUI listing, s
 static struct {
     uint8_t  status, mine;       /* mine: we started the player and own it until exit */
     uint8_t  fstype;
-    uint32_t root, clus_fdt, clus_ex, clus, files, cur, seen_clus, seen_num, rnd;
-    uint8_t  from_db;            /* file numbers came from the library database */
-    uint16_t nums[MAX_TRACKS];   /* file numbers (1-based) of the folder's tracks, when from_db */
-    uint8_t  ex[0x2C];           /* /_blockgame/'s directory info (exFAT) */
-    uint32_t scan_r, scan_total, scan_base;   /* library search in progress (BGM_SCAN) */
+    uint32_t root, clus, files, cur, seen_clus, seen_num, rnd;
 } M;
 
 static uint32_t m_rd32(uint32_t a) { volatile uint8_t *p = (volatile uint8_t *)a; return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
@@ -71,67 +63,164 @@ static uint32_t m_random(uint32_t n)
     return n ? (M.rnd >> 8) % n : 0;
 }
 
-/* Library database (what Music uses): 2 KB records from sector sys+0x79 on the internal flash volume, record
- * +0 = folder cluster, +4 = file number. Collect the tracks whose folder is /_blockgame/, SCAN_STEP records per
- * call (bgm_poll), so Blockz keeps running while it searches. Returns 1 when the search is finished. */
-static void db_begin(void)
-{
-    /* library track count = sys+0x2E (written by the build, module 5); TotalFiles(FILTER, 3) turned out to count
-     * the current folder for source 0x63, often 0 in Blockz (build 26-28: EMPTY). Stop at erased records. */
-    M.scan_base = m_rd32(SYSC + 0x79);
-    M.scan_total = *(volatile uint16_t *)(SYSC + 0x2E);
-    if (!M.scan_total || M.scan_total > 20000) M.scan_total = 20000;
-    M.scan_r = 0;
-}
+/* exFAT directory walk (build 34). Builds 25-33 used stock's folder iterator, whose directory info is the
+ * root's, not the found folder's: the folder was found by name, then its file count and the library-database
+ * search both came back empty (EMPTY). We read the card ourselves instead, with the raw sector read the scan skip
+ * uses (libscan.c, proven on the owner's card): root directory -> "_blockgame" entry set -> its first cluster ->
+ * count the files whose extension is in stock's audio filter. A few sectors per service call (MUSIC panel SCAN).
+ * Owner's card: /_blockgame/ = cluster 0x000A0C32 (Windows LCN 0xA0C30), one file. */
+#ifndef BGWALK_HOST             /* game/test/test_bgwalk.c supplies these */
+#define ReadSec(l, b) STOCK_FN(0x03057CC8, uint32_t, uint32_t, void *)(l, b)
+#define VOLI      0x0307E710u   /* +0 FS type (3 = exFAT), +2 sectors/cluster shift, +4 bytes/sector shift;
+                                   +0x0C volume info: +0x0D root cluster, +0x1F heap LBA, +0x23 partition LBA */
+#endif
+#define WALK_STEP 4             /* sectors per service call */
+#define WALK_MAX  4096          /* sectors per directory before giving up */
+#define WALK_INTO (-1)          /* walk_entry: found /_blockgame/, now walking it */
 
-static int db_step(void)
+static struct {
+    uint32_t lba, sec_in_clus, clus, nofat, sec_left, reads;
+    uint32_t heap, part, fat, shift;
+    uint8_t  phase;              /* 0 root, 1 /_blockgame/ */
+    uint8_t  in_set, sec_rem, is_dir, dot, elen;
+    uint16_t nlen, name[10];
+    uint8_t  ext[4];
+    uint32_t first, flags, len;
+    uint32_t buf[132];           /* one sector; also find_folder's name buffer (0x104 chars) on FAT cards */
+} W;
+
+static int ext_audio(void)
 {
-    uint32_t rec[2];
-    for (int k = 0; k < SCAN_STEP; k++, M.scan_r++) {
-        if (M.scan_r >= M.scan_total || M.files >= MAX_TRACKS) return 1;
-        FlashRead((M.scan_base << 9) + (M.scan_r << 11), 8, rec);
-        if (rec[0] == 0xFFFFFFFFu) return 1;
-        if (rec[1] && (rec[0] == M.clus_ex || rec[0] == M.clus_fdt)) {
-            M.clus = rec[0];
-            M.nums[M.files++] = (uint16_t)rec[1];
-        }
-    }
+    if (W.elen < 3) return 0;
+    const volatile uint8_t *f = (const volatile uint8_t *)FILTER;   /* "MP1MP2MP3WMA...": 3-letter groups */
+    for (int i = 0; i < 60 && f[i] && f[i + 1] && f[i + 2]; i += 3)
+        if (f[i] == W.ext[0] && f[i + 1] == W.ext[1] && f[i + 2] == W.ext[2]) return 1;
     return 0;
 }
 
-/* find /_blockgame/ in the root of the current disk; fills M.clus, M.ex, M.files */
+static void walk_dir(uint32_t clus, uint32_t nofat, uint32_t bytes)
+{
+    W.clus = clus; W.nofat = nofat;
+    W.lba = W.heap + ((clus - 2) << W.shift); W.sec_in_clus = 0;
+    W.sec_left = nofat ? (bytes + 511) >> 9 : WALK_MAX;
+    if (W.sec_left > WALK_MAX) W.sec_left = WALK_MAX;
+    W.in_set = 0;
+}
+
+static int walk_done(void) { return W.phase ? (M.files ? BGM_PLAY : BGM_NOFILE) : BGM_NOFOLDER; }
+
+static int walk_begin(void)
+{
+    const volatile uint8_t *v = (const volatile uint8_t *)VOLI;
+    W.shift = v[2] | v[3] << 8;
+    if ((v[4] | v[5] << 8) != 9 || W.shift > 16) return BGM_ERRFIND;
+    M.root = m_rd32(VOLI + 0x0C + 0x0D);
+    W.heap = m_rd32(VOLI + 0x0C + 0x1F);
+    W.part = m_rd32(VOLI + 0x0C + 0x23);
+    if (M.root < 2) return BGM_ERRFIND;
+    uint8_t *s = (uint8_t *)W.buf;
+    ReadSec(W.part, W.buf);
+    if (s[3] != 'E' || s[4] != 'X' || s[5] != 'F') return BGM_ERRFIND;
+    W.fat = W.part + (s[0x50] | s[0x51] << 8 | s[0x52] << 16 | (uint32_t)s[0x53] << 24);
+    W.phase = 0; W.reads = 0;
+    walk_dir(M.root, 0, 0);
+    return BGM_SCAN;
+}
+
+/* one 32-byte directory entry: BGM_SCAN to go on, WALK_INTO, or the final status */
+static int walk_entry(const uint8_t *e)
+{
+    uint8_t t = e[0];
+    if (t == 0) return walk_done();                        /* end of directory */
+    if (t == 0x85) {                                       /* file / folder entry set */
+        W.in_set = 1; W.sec_rem = e[1]; W.is_dir = (e[4] & 0x10) != 0;
+        W.nlen = 0; W.dot = 0; W.elen = 0;
+        return BGM_SCAN;
+    }
+    if (!W.in_set) return BGM_SCAN;
+    if (!(t & 0x80)) { W.in_set = 0; return BGM_SCAN; }    /* deleted entry inside a set */
+    if (t == 0xC0) {                                       /* stream extension */
+        W.flags = e[1];
+        W.first = e[20] | e[21] << 8 | e[22] << 16 | (uint32_t)e[23] << 24;
+        W.len = e[24] | e[25] << 8 | e[26] << 16 | (uint32_t)e[27] << 24;
+    } else if (t == 0xC1) {                                /* 15 name characters */
+        for (int i = 0; i < 15; i++) {
+            uint16_t c = e[2 + 2 * i] | e[3 + 2 * i] << 8;
+            if (!c) break;
+            if (c >= 'a' && c <= 'z') c -= 32;
+            if (W.nlen < 10) W.name[W.nlen] = c;
+            W.nlen++;
+            if (c == '.') { W.dot = 1; W.elen = 0; }
+            else if (W.dot && W.elen < 4) W.ext[W.elen++] = (uint8_t)c;
+        }
+    }
+    if (W.sec_rem && --W.sec_rem) return BGM_SCAN;
+    W.in_set = 0;                                          /* entry set complete */
+    if (W.phase == 0) {
+        static const char want[10] = "_BLOCKGAME";
+        if (!W.is_dir || W.nlen != 10) return BGM_SCAN;
+        for (int i = 0; i < 10; i++) if (W.name[i] != (uint8_t)want[i]) return BGM_SCAN;
+        if (W.first < 2) return BGM_NOFILE;
+        M.clus = W.first;
+        W.phase = 1;
+        walk_dir(W.first, W.flags & 2, W.len);             /* flags bit 1: contiguous, no FAT chain */
+        return WALK_INTO;
+    }
+    if (!W.is_dir && ext_audio()) M.files++;
+    return BGM_SCAN;
+}
+
+static uint32_t fat_next(uint32_t c)
+{
+    ReadSec(W.fat + (c >> 7), W.buf);
+    return W.buf[c & 127];
+}
+
+/* a few sectors per call; BGM_SCAN while running, else the final status */
+static int walk_step(void)
+{
+    for (int k = 0; k < WALK_STEP; k++) {
+        if (!W.sec_left) return walk_done();
+        W.sec_left--;
+        ReadSec(W.lba, W.buf);
+        W.reads++;
+        const uint8_t *s = (const uint8_t *)W.buf;
+        int r = BGM_SCAN;
+        for (int e = 0; e < 512 && r == BGM_SCAN; e += 32) r = walk_entry(s + e);
+        if (r == WALK_INTO) continue;                      /* walk_dir set the folder's first sector */
+        if (r != BGM_SCAN) return r;
+        W.lba++;
+        if (++W.sec_in_clus >= (1u << W.shift)) {          /* next cluster */
+            W.sec_in_clus = 0;
+            uint32_t n = W.nofat ? W.clus + 1 : fat_next(W.clus);
+            if (n < 2 || n >= 0x0FFFFFF7u) return walk_done();
+            W.clus = n;
+            W.lba = W.heap + ((n - 2) << W.shift);
+        }
+    }
+    return BGM_SCAN;
+}
+
+/* FAT cards: stock's iterator (untested on the device; the owner's card is exFAT) */
 static int find_folder(void)
 {
     static fs_iter_t it;
     static uint8_t fdt[0x40];
-    static uint16_t name[0x104];
-    M.fstype = *(volatile uint8_t *)0x0307E710;
+    uint16_t *name = (uint16_t *)W.buf;        /* 0x104 chars, shares the walk's sector buffer */
     M.root = m_rd32(0x0307E71C + 0x0D);
     for (unsigned i = 0; i < sizeof it; i++) ((uint8_t *)&it)[i] = 0;
     it.clus = M.root;
-    if (M.fstype == 3) {                        /* root's exFAT info, as the browser seeds its root entry */
-        it.ex[0] = (uint8_t)M.root; it.ex[1] = (uint8_t)(M.root >> 8);
-        it.ex[2] = (uint8_t)(M.root >> 16); it.ex[3] = (uint8_t)(M.root >> 24);
-        it.ex[0x0C] = 1;
-        it.count = ExFiles(it.ex, FILTER, FTYPE) + ExDirs(it.ex, FTYPE);
-    } else {
-        it.count = FatFiles(M.root, FILTER, FTYPE) + FatDirs(M.root, FTYPE);
-    }
+    it.count = FatFiles(M.root, FILTER, FTYPE) + FatDirs(M.root, FTYPE);
     if (FindFirst(fdt, &it, FILTER, FTYPE) != 0) return BGM_ERRFIND;
     for (int n = 0; n < 4000; n++) {
-        if (fdt[0x0B] & 0x10) {                 /* a folder: compare its long name */
+        if (fdt[0x0B] & 0x10) {                            /* a folder: compare its long name */
             name[0] = 0;
-            if (M.fstype == 3) ExName(it.ex, it.index - 1, FTYPE, name);
-            else FatName(it.clus, it.index - 1, FTYPE, name);
+            FatName(it.clus, it.index - 1, FTYPE, name);
             name[0x100] = 0;
             if (name_is_blockgame(name)) {
-                M.clus_fdt = (uint32_t)(fdt[0x14] | fdt[0x15] << 8) << 16 | fdt[0x1A] | fdt[0x1B] << 8;
-                M.clus_ex = it.ex[0] | it.ex[1] << 8 | it.ex[2] << 16 | (uint32_t)it.ex[3] << 24;
-                for (int i = 0; i < 0x2C; i++) M.ex[i] = it.ex[i];
-                M.clus = M.fstype == 3 ? M.clus_ex : M.clus_fdt;
-                M.files = M.fstype == 3 ? ExFiles(M.ex, FILTER, FTYPE) : FatFiles(M.clus, FILTER, FTYPE);
-                if (!M.files) { db_begin(); return BGM_SCAN; }   /* stock's folder count can return 0 (owner's folder) */
-                return BGM_PLAY;
+                M.clus = (uint32_t)(fdt[0x14] | fdt[0x15] << 8) << 16 | fdt[0x1A] | fdt[0x1B] << 8;
+                M.files = FatFiles(M.clus, FILTER, FTYPE);
+                return M.files ? BGM_PLAY : BGM_NOFILE;
             }
         }
         if (FindNext(fdt, &it, FILTER, FTYPE) != 0) break;
@@ -149,12 +238,8 @@ static void point_record(uint32_t num)
 
 static uint32_t pick_track(void)
 {
-    uint32_t i = m_random(M.files);
-    uint32_t n = M.from_db ? M.nums[i] : i + 1;
-    if (M.files > 1 && n == M.cur) {                       /* no immediate repeat */
-        i = (i + 1) % M.files;
-        n = M.from_db ? M.nums[i] : i + 1;
-    }
+    uint32_t n = m_random(M.files) + 1;                    /* audio files numbered 1.. in folder order */
+    if (M.files > 1 && n == M.cur) n = n % M.files + 1;    /* no immediate repeat */
     return n;
 }
 
@@ -184,18 +269,17 @@ static void bgm_start(uint32_t seed)
         *(volatile uint8_t *)(SYSC + 0x0E) = 4;
         DiskSwitch(4);
     }
-    M.status = (uint8_t)find_folder();
+    M.fstype = *(volatile uint8_t *)VOLI;
+    M.status = (uint8_t)(M.fstype == 3 ? walk_begin() : find_folder());
     if (M.status == BGM_PLAY) bgm_play();
 }
 
 /* every service call while Blockz runs: keep the player inside /_blockgame/ */
 static void bgm_poll(void)
 {
-    if (M.status == BGM_SCAN) {                    /* library search, a slice per call */
-        if (db_step()) {
-            M.from_db = M.files != 0;
-            if (M.files) bgm_play(); else M.status = BGM_NOFILE;
-        }
+    if (M.status == BGM_SCAN) {                    /* card walk, a few sectors per call */
+        int r = walk_step();
+        if (r != BGM_SCAN) { M.status = (uint8_t)r; if (r == BGM_PLAY) bgm_play(); }
         return;
     }
     if (!M.mine) return;

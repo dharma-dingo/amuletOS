@@ -34,6 +34,9 @@ def test():
     lib = OUT / "test_libscan.exe"    # library scan skip (device/libscan.c) on a simulated exFAT card
     run(ZIG + ["-O1", "-w", "-I", ROOT, "-o", lib, ROOT / "test" / "test_libscan.c"])
     run([lib])
+    bw = OUT / "test_bgwalk.exe"      # Blockz music folder walk (device/bgmusic.c) on a simulated exFAT card, 32-bit
+    run(ZIG + ["-target", "x86-windows-gnu", "-O1", "-w", "-I", ROOT, "-o", bw, ROOT / "test" / "test_bgwalk.c"])
+    run([bw])
 
 def preview():
     from PIL import Image

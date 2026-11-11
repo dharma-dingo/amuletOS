@@ -300,8 +300,8 @@ static void info_page(void)
     b[k] = 0;
     text(14, 10 + 11 * 16, b, C_TEXT);
     static const uint8_t dbg1[3] = {2, 8, 8}, dbg2[3] = {8, 4, 4};
-    v[0] = M.fstype; v[1] = M.root; v[2] = M.clus_fdt; info_line(12, "BG", v, dbg1, 3);
-    v[0] = M.clus_ex; v[1] = M.files; v[2] = M.cur;    info_line(13, "BX", v, dbg2, 3);
+    v[0] = M.fstype; v[1] = M.root; v[2] = M.clus;  info_line(12, "BG", v, dbg1, 3);   /* FS, root, folder cluster */
+    v[0] = W.reads;  v[1] = M.files; v[2] = M.cur;  info_line(13, "BX", v, dbg2, 3);   /* sectors read, files, track */
 }
 
 static void paint(void)

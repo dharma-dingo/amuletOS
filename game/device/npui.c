@@ -17,20 +17,21 @@ typedef struct { uint16_t x0, y0, x1, y1; } rect_t;
 #define C_ACCENT RGB(0x7353e0)     /* grape: artist, bar fill */
 #define C_TRACK  RGB(0xdfe1e8)
 
-/* layout (screen pixels): right frame fill x 148..281 / y 44..163, bottom frame fill x 15..280 / y 176..227 */
+/* layout (screen pixels): right frame fill x 148..281 / y 44..163, bottom frame fill x 23..272 / y 174..227;
+ * frames have 8 px rounded corners (art/pocket.py R_NP), so fills stay 6 px clear of the frame corners */
 #define RX0 154            /* right panel text */
 #define RX1 278
 #define ARTIST_Y 50
 #define ALBUM_Y  96
 #define LINE_GAP 20
-#define TX0 19             /* title band, double size: TX1 - TX0 + 1 must be even */
-#define TX1 276
-#define TY0 177
+#define TX0 29             /* title band, double size: TX1 - TX0 + 1 must be even */
+#define TX1 266
+#define TY0 176
 #define TH  32
-#define BAR_X0 69          /* progress bar; room each side for "-1:05:01" */
-#define BAR_X1 224
-#define BAR_Y  216         /* 4 px track; playhead 4 x 12 from BAR_Y - 4 */
-#define TIME_Y 212
+#define BAR_X0 79          /* progress bar; room each side for "-1:05:01" */
+#define BAR_X1 216
+#define BAR_Y  215         /* 4 px track; playhead 4 x 12 from BAR_Y - 4 */
+#define TIME_Y 211
 #define COUNT_X 22         /* status bar track counter, clear of the rounded corner */
 #define COUNT_Y 9
 #define TSPACE 5           /* space in the big title (single-size px; the font's 8 doubles too wide) */
@@ -102,6 +103,10 @@ static void wrapn(int y, const uint16_t *s, uint16_t col, uint32_t mode, int lin
 void np_artist(rect_t *r, rect_t *r2, const uint16_t *s, uint32_t mode) { wrapn(ARTIST_Y, s, C_ACCENT, mode, 2); }
 void np_album(rect_t *r, rect_t *r2, const uint16_t *s, uint32_t mode)  { wrapn(ALBUM_Y, s, C_TEXT, mode, 3); }
 void np_clear_artist(void) { fill(RX0, ARTIST_Y, RX1, ARTIST_Y + 2 * LINE_GAP - 3, C_PANEL); }
+/* replaces stock's three 128 px line clears (image 69 at x 168, y 91/112/133): they ran past the panel's right
+ * border (white bars on the frame, owner build 33); clear just the panel's text area, so an empty album still
+ * erases the previous one */
+void np_clear_info(void) { fill(RX0, ARTIST_Y, RX1, ALBUM_Y + 3 * LINE_GAP - 3, C_PANEL); }
 
 /* ---------- small numbers: track counter, times ---------- */
 static uint16_t *put_num(uint16_t *p, uint32_t v, int min_digits)

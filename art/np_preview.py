@@ -32,17 +32,17 @@ def background():
     return ((a[..., 0] >> 3) << 11 | (a[..., 1] >> 2) << 5 | (a[..., 2] >> 3)).astype("<u2")
 
 
-CORNER = 18   # rough radius of the AP30's rounded screen bezel (owner, build 28), drawn black in the preview
+CORNER_TOP, CORNER_BOTTOM = 24, 48   # bezel radii estimated from the owner's photo of build 33 (bottom much rounder)
 
 
 def to_image(raw):
     v = np.frombuffer(raw, "<u2").reshape(240, 296).astype(np.uint32)
     rgb = np.stack([(v >> 11) << 3, ((v >> 5) & 63) << 2, (v & 31) << 3], -1).astype(np.uint8)
-    yy, xx = np.mgrid[0:240, 0:296]
-    for cx, cy in ((CORNER, CORNER), (295 - CORNER, CORNER), (CORNER, 239 - CORNER), (295 - CORNER, 239 - CORNER)):
-        out = ((xx - cx) * np.sign(xx - cx) > 0) & ((yy - cy) * np.sign(yy - cy) > 0)
-        near = ((xx < CORNER) | (xx > 295 - CORNER)) & ((yy < CORNER) | (yy > 239 - CORNER))
-        rgb[near & out & (((xx - cx) ** 2 + (yy - cy) ** 2) > CORNER ** 2) & (np.abs(xx - cx) <= CORNER + 1) & (np.abs(yy - cy) <= CORNER + 1)] = 0
+    yy, xx = np.mgrid[0:240, 0:296].astype(float) + 0.5
+    for r, cy in ((CORNER_TOP, CORNER_TOP), (CORNER_BOTTOM, 240 - CORNER_BOTTOM)):
+        for cx in (r, 296 - r):
+            zone = (np.abs(xx - cx) > 0) & ((xx < cx) if cx == r else (xx > cx)) & ((yy < cy) if cy == r else (yy > cy))
+            rgb[zone & (((xx - cx) ** 2 + (yy - cy) ** 2) > r * r)] = 0
     return Image.fromarray(rgb)
 
 
