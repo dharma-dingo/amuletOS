@@ -5,36 +5,33 @@
  * status bar. Code-only overlay in module slot 28, run address 0x03083F0C, at most 0x758 B (free while Now
  * Playing runs: module 27 ends there, module 18 starts at 0x03084664; modules 9 and 12 there are USB only), loaded by np_load (slot 2) at the end of
  * module 27's init. No data or ZI: stack only; the title scroll state lives at SCROLL (RAM above slot 2).
- * Layout (owner, option A): art/np_options.py, art/screens.py now_playing(); patches: tools/patch_code.py np_v4. */
+ * Layout (owner, option A): art/np_options.py; Pocket frames: art/pocket.py now_playing(); patches: tools/patch_code.py np_v4. */
 #include <stdint.h>
 
 typedef struct { uint16_t x0, y0, x1, y1; } rect_t;
 
 #define RGB(h) ((uint16_t)((((h) >> 19) & 0x1F) << 11 | (((h) >> 10) & 0x3F) << 5 | (((h) >> 3) & 0x1F)))
-#define C_PANEL  RGB(0xfffdf6)
-#define C_SHADE  RGB(0xe4eaf2)
-#define C_TEXT   RGB(0x121a40)
-#define C_ACCENT RGB(0xd9a02a)
-#define C_BORDER RGB(0x283c88)
-#define C_DIM    RGB(0x6a7cb0)
-#define C_LAV    RGB(0xc6b2f4)
-#define C_LAVINK RGB(0x7d5bc9)
+/* Pocket look (owner, 2026-11-11; art/pocket.py now_playing() draws the frames these sit in) */
+#define C_PANEL  RGB(0xffffff)     /* frame fill and status band */
+#define C_TEXT   RGB(0x23252e)     /* ink */
+#define C_ACCENT RGB(0x7353e0)     /* grape: artist, bar fill */
+#define C_TRACK  RGB(0xdfe1e8)
 
-/* layout (screen pixels) */
-#define RX0 152            /* right panel text */
-#define RX1 280            /* panel fill ends at 281 (inset from the rounded screen corners) */
-#define ARTIST_Y 44
-#define ALBUM_Y  94
+/* layout (screen pixels): right frame fill x 148..281 / y 44..163, bottom frame fill x 15..280 / y 176..227 */
+#define RX0 154            /* right panel text */
+#define RX1 278
+#define ARTIST_Y 50
+#define ALBUM_Y  96
 #define LINE_GAP 20
-#define TX0 14             /* title band, double size (panel fill x 10..281, y 172..223) */
-#define TX1 279
-#define TY0 172
+#define TX0 19             /* title band, double size: TX1 - TX0 + 1 must be even */
+#define TX1 276
+#define TY0 177
 #define TH  32
-#define BAR_X0 62          /* progress bar; room each side for "-1:05:01" */
-#define BAR_X1 226
-#define BAR_Y  212
-#define TIME_Y 209
-#define COUNT_X 18         /* status bar track counter, clear of the rounded corner */
+#define BAR_X0 69          /* progress bar; room each side for "-1:05:01" */
+#define BAR_X1 224
+#define BAR_Y  216         /* 4 px track; playhead 4 x 12 from BAR_Y - 4 */
+#define TIME_Y 212
+#define COUNT_X 22         /* status bar track counter, clear of the rounded corner */
 #define COUNT_Y 9
 #define TSPACE 5           /* space in the big title (single-size px; the font's 8 doubles too wide) */
 #define GAP_S 24           /* scroll loop gap (single-size px) */
@@ -158,15 +155,13 @@ void np_progress(void)
 {
     uint32_t *P = PLAY;
     uint32_t tot = P ? P[0] : 0, pos = P ? P[1] : 0;
-    int w = BAR_X1 - BAR_X0 - 3;
+    int w = BAR_X1 - BAR_X0;
     if (pos > tot) pos = tot;
     int px = tot >= 16 ? (int)((pos >> 4) * (uint32_t)w / (tot >> 4)) : 0;   /* 32-bit: tracks up to ~5 h */
-    fill(BAR_X0 - 2, BAR_Y - 4, BAR_X1 + 2, BAR_Y + 11, C_PANEL);   /* old playhead */
-    fill(BAR_X0, BAR_Y, BAR_X1, BAR_Y + 7, C_BORDER);
-    fill(BAR_X0 + 2, BAR_Y + 2, BAR_X1 - 2, BAR_Y + 5, C_SHADE);
-    if (px > 0) fill(BAR_X0 + 2, BAR_Y + 2, BAR_X0 + 1 + px, BAR_Y + 5, C_ACCENT);
-    fill(BAR_X0 + px - 1, BAR_Y - 4, BAR_X0 + px + 4, BAR_Y + 11, C_LAVINK);
-    fill(BAR_X0 + px + 1, BAR_Y - 2, BAR_X0 + px + 2, BAR_Y + 9, C_LAV);
+    fill(BAR_X0 - 2, BAR_Y - 4, BAR_X1 + 2, BAR_Y + 7, C_PANEL);    /* old playhead */
+    fill(BAR_X0, BAR_Y, BAR_X1, BAR_Y + 3, C_TRACK);
+    if (px > 0) fill(BAR_X0, BAR_Y, BAR_X0 + px - 1, BAR_Y + 3, C_ACCENT);
+    fill(BAR_X0 + px - 2, BAR_Y - 4, BAR_X0 + px + 1, BAR_Y + 7, C_TEXT);
 }
 
 /* ---------- title: double size, scrolling when wider than the band ---------- */

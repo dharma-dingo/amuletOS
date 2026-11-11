@@ -5,7 +5,7 @@ Neutral greys map onto a navy-tinted ramp (black -> deep navy, light grey -> cre
 warm beige/tan (the Hidizs accent) maps onto gold, and its pale tints (selection
 highlights) onto a lavender tint. Other hues (coloured SDK icons) are kept.
 
-  python art/recolor.py STOCK_PNG_DIR HANDMADE_DIR OUTDIR
+  python art/recolor.py STOCK_PNG_DIR HANDMADE_DIR OUTDIR [pocket]
 """
 import os, sys
 import numpy as np
@@ -17,6 +17,12 @@ GREY = [(0.00, "#0c1030"), (0.15, "#121a40"), (0.40, "#33447e"), (0.65, "#7d8cb8
         (0.85, "#d4dcec"), (0.93, "#fffdf6"), (1.00, "#ffffff")]
 WARM = [(0.00, "#5a3a10"), (0.45, "#a8701c"), (0.68, "#d9a02a"), (0.80, "#ecc672"),
         (0.88, "#e6dcf6"), (1.00, "#f4f0fd")]
+
+# Pocket look (art/pocket.py): greys onto ink -> white, the Hidizs warm accent onto grape
+POCKET_GREY = [(0.00, "#16171d"), (0.15, "#23252e"), (0.40, "#4a4e5c"), (0.65, "#7d8291"),
+               (0.85, "#dfe1e8"), (0.93, "#ffffff"), (1.00, "#ffffff")]
+POCKET_WARM = [(0.00, "#2e2070"), (0.45, "#5a40c0"), (0.68, "#7353e0"), (0.80, "#a993f0"),
+               (0.88, "#e9e3fb"), (1.00, "#f4f1fe")]
 
 def ramp(stops, v):
     xs = np.array([s for s, _ in stops]); cs = np.array([hexrgb(c) for _, c in stops])
@@ -42,7 +48,10 @@ def recolor(a):
     return np.clip(out, 0, 255).astype(np.uint8)
 
 def main():
+    global GREY, WARM
     src, hand, out = sys.argv[1:4]
+    if sys.argv[4:5] == ["pocket"]:
+        GREY, WARM = POCKET_GREY, POCKET_WARM
     os.makedirs(out, exist_ok=True)
     done = {f for f in os.listdir(hand) if f.endswith(".png")}
     n = 0

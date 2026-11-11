@@ -13,9 +13,9 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "art"))
-import screens  # noqa: E402
+import pocket  # noqa: E402
 
-ART = ROOT / "build/art_v01_all"
+ART = ROOT / "build/art_pocket_all"
 ZIG = [sys.executable, "-m", "ziglang", "cc"]
 SAMPLES = [
     ("Scars of Time", "Yasunori Mitsuda", "Chrono Cross Original Soundtrack", 102, 245, 3, 22),
@@ -25,7 +25,7 @@ SAMPLES = [
 
 
 def background():
-    im = screens.now_playing().image(2).convert("RGB")
+    im = pocket.now_playing().image(1).convert("RGB")
     for n, xy in ((34, (105, 10)), (31, (143, 6)), (45, (183, 7)), (287, (209, 11)), (277, (17, 46))):
         im.paste(Image.open(ART / f"{n:03d}.png").convert("RGB"), xy)
     a = np.array(im).astype(np.uint16)
@@ -47,7 +47,7 @@ def to_image(raw):
 
 
 def main():
-    fdir = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build/v027"
+    fdir = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build/v029"
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "build/np_preview"
     out.mkdir(parents=True, exist_ok=True)
     exe = out / "np_preview.exe"
