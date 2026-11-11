@@ -37,6 +37,9 @@ def test():
     bw = OUT / "test_bgwalk.exe"      # Blockz music folder walk (device/bgmusic.c) on a simulated exFAT card, 32-bit
     run(ZIG + ["-target", "x86-windows-gnu", "-O1", "-w", "-I", ROOT, "-o", bw, ROOT / "test" / "test_bgwalk.c"])
     run([bw])
+    tp = OUT / "test_playlists.exe"   # playlist resolver (device/exfat.c + pl_core.c) on a simulated card, 32-bit
+    run(ZIG + ["-target", "x86-windows-gnu", "-O1", "-w", "-I", ROOT, "-o", tp, ROOT / "test" / "test_playlists.c"])
+    run([tp])
 
 def preview():
     from PIL import Image

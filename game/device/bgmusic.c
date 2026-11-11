@@ -41,7 +41,9 @@ typedef struct {                 /* the browser's iterator (BrowserUI listing, s
 static struct {
     uint8_t  status, mine;       /* mine: we started the player and own it until exit */
     uint8_t  fstype;
-    uint32_t root, clus, files, cur, seen_clus, seen_num, rnd;
+    uint32_t root, clus, files, cur, rnd;
+    uint8_t  restarts;
+    uint16_t nums[PLT_MAX];      /* file numbers (directory slot + 1) of the folder's tracks */
 } M;
 
 static uint32_t m_rd32(uint32_t a) { volatile uint8_t *p = (volatile uint8_t *)a; return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
@@ -79,7 +81,7 @@ static uint32_t m_random(uint32_t n)
 #define WALK_INTO (-1)          /* walk_entry: found /_blockgame/, now walking it */
 
 static struct {
-    uint32_t lba, sec_in_clus, clus, nofat, sec_left, reads;
+    uint32_t lba, sec_in_clus, clus, nofat, sec_left, reads, dsec, set_slot;
     uint32_t heap, part, fat, shift;
     uint8_t  phase;              /* 0 root, 1 /_blockgame/ */
     uint8_t  in_set, sec_rem, is_dir, dot, elen;
@@ -101,7 +103,7 @@ static int ext_audio(void)
 static void walk_dir(uint32_t clus, uint32_t nofat, uint32_t bytes)
 {
     W.clus = clus; W.nofat = nofat;
-    W.lba = W.heap + ((clus - 2) << W.shift); W.sec_in_clus = 0;
+    W.lba = W.heap + ((clus - 2) << W.shift); W.sec_in_clus = 0; W.dsec = 0;
     W.sec_left = nofat ? (bytes + 511) >> 9 : WALK_MAX;
     if (W.sec_left > WALK_MAX) W.sec_left = WALK_MAX;
     W.in_set = 0;
@@ -128,12 +130,12 @@ static int walk_begin(void)
 }
 
 /* one 32-byte directory entry: BGM_SCAN to go on, WALK_INTO, or the final status */
-static int walk_entry(const uint8_t *e)
+static int walk_entry(const uint8_t *e, uint32_t slot)
 {
     uint8_t t = e[0];
     if (t == 0) return walk_done();                        /* end of directory */
     if (t == 0x85) {                                       /* file / folder entry set */
-        W.in_set = 1; W.sec_rem = e[1]; W.is_dir = (e[4] & 0x10) != 0;
+        W.in_set = 1; W.sec_rem = e[1]; W.is_dir = (e[4] & 0x10) != 0; W.set_slot = slot;
         W.nlen = 0; W.dot = 0; W.elen = 0;
         return BGM_SCAN;
     }
@@ -166,7 +168,10 @@ static int walk_entry(const uint8_t *e)
         walk_dir(W.first, W.flags & 2, W.len);             /* flags bit 1: contiguous, no FAT chain */
         return WALK_INTO;
     }
-    if (!W.is_dir && ext_audio()) M.files++;
+    if (!W.is_dir && ext_audio()) {                        /* file number = directory slot + 1 (HARDWARE.md) */
+        if (M.files < PLT_MAX) M.nums[M.files] = (uint16_t)(W.set_slot + 1);
+        M.files++;
+    }
     return BGM_SCAN;
 }
 
@@ -186,10 +191,10 @@ static int walk_step(void)
         W.reads++;
         const uint8_t *s = (const uint8_t *)W.buf;
         int r = BGM_SCAN;
-        for (int e = 0; e < 512 && r == BGM_SCAN; e += 32) r = walk_entry(s + e);
+        for (int e = 0; e < 512 && r == BGM_SCAN; e += 32) r = walk_entry(s + e, W.dsec * 16 + e / 32);
         if (r == WALK_INTO) continue;                      /* walk_dir set the folder's first sector */
         if (r != BGM_SCAN) return r;
-        W.lba++;
+        W.lba++; W.dsec++;
         if (++W.sec_in_clus >= (1u << W.shift)) {          /* next cluster */
             W.sec_in_clus = 0;
             uint32_t n = W.nofat ? W.clus + 1 : fat_next(W.clus);
@@ -220,6 +225,7 @@ static int find_folder(void)
             if (name_is_blockgame(name)) {
                 M.clus = (uint32_t)(fdt[0x14] | fdt[0x15] << 8) << 16 | fdt[0x1A] | fdt[0x1B] << 8;
                 M.files = FatFiles(M.clus, FILTER, FTYPE);
+                for (uint32_t i = 0; i < M.files && i < PLT_MAX; i++) M.nums[i] = (uint16_t)(i + 1);   /* untested */
                 return M.files ? BGM_PLAY : BGM_NOFILE;
             }
         }
@@ -228,31 +234,46 @@ static int find_folder(void)
     return BGM_NOFOLDER;
 }
 
-static void point_record(uint32_t num)
-{
-    *(volatile uint16_t *)(PREC + 0xF2) = 0x63;  /* source as seen when playing from Folders */
-    *(volatile uint32_t *)(PREC + 0x34) = M.clus;
-    *(volatile uint32_t *)(PREC + 0x38) = num;
-    M.cur = num; M.seen_clus = M.clus; M.seen_num = num;
-}
-
-static uint32_t pick_track(void)
-{
-    uint32_t n = m_random(M.files) + 1;                    /* audio files numbered 1.. in folder order */
-    if (M.files > 1 && n == M.cur) n = n % M.files + 1;    /* no immediate repeat */
-    return n;
-}
-
-/* start the player on a random track of the folder (M.files > 0) */
+/* Start the player on the folder's tracks in a shuffled order (build 35). The tracks go in the playlist table
+ * (pl_table.h), so the player itself moves to the next one at track end (np_helpers.c pl_step); the record and
+ * the start copy Now Playing's init (m27 0x030815C4), including the engine byte 0x030483C8 = 1 that builds 25-34
+ * left out (the player ran but played nothing). */
 static void bgm_play(void)
 {
-    RecPrepare();                                  /* browser's play-request prep, then our file over it */
-    point_record(pick_track());
-    static uint16_t arg[2];
+    volatile pl_table_t *t = PLT;
+    uint32_t n = M.files < PLT_MAX ? M.files : PLT_MAX;
+    uint16_t order[PLT_MAX];
+    for (uint32_t i = 0; i < n; i++) order[i] = M.nums[i];
+    for (uint32_t i = n; i > 1; i--) {                     /* shuffle */
+        uint32_t j = m_random(i), k = order[i - 1];
+        order[i - 1] = order[j]; order[j] = (uint16_t)k;
+    }
+    t->magic = 0;
+    for (uint32_t i = 0; i < n; i++) { t->clus[i] = M.clus; t->num[i] = order[i]; }
+    t->n = (uint16_t)n; t->cur = 0;
+    t->magic = PLT_MAGIC;
+
+    RecPrepare();                                          /* the browser's play-request prep */
+    *(volatile uint16_t *)0x03022BAC = 0x63;
+    *(volatile uint16_t *)(PREC + 0xF2) = 0x63;            /* source as when playing from Folders */
+    *(volatile uint32_t *)(PREC + 0x10) = 0x030056C0u;
+    *(volatile uint32_t *)(PREC + 0x34) = M.clus;
+    *(volatile uint32_t *)(PREC + 0x38) = order[0];
+    *(volatile uint16_t *)(PREC + 0) = (uint16_t)n;
+    *(volatile uint16_t *)(PREC + 2) = 1;
+    *(volatile uint16_t *)(PREC + 6) = 1;
+    *(volatile uint32_t *)(PREC + 0x44) = 0;
+    *(volatile uint32_t *)(PREC + 0x48) = 0;
+    *(volatile uint32_t *)(PREC + 0x4C) = 0;
+    *(volatile uint8_t *)(SYSC + 0x64) = 0;                /* no resume point */
+    static uint16_t arg[14];
     arg[0] = 1; arg[1] = 0x46;
+    *(volatile uint16_t *)0x0302283Cu = arg[1];           /* as Now Playing's init */
     ThreadDelete(PHAND);
     ModuleLoad(33);
     ThreadCreate(PHAND, PDESC, arg);
+    *(volatile uint8_t *)0x030483C8u = 1;                  /* 0x0308CFB8(1) in Now Playing's init */
+    M.cur = order[0];
     if (ThreadRunning(m_rd32(PHAND), PDESC) != 1) { M.status = BGM_ERRSTART; return; }
     M.status = BGM_PLAY;
     M.mine = 1;
@@ -274,7 +295,7 @@ static void bgm_start(uint32_t seed)
     if (M.status == BGM_PLAY) bgm_play();
 }
 
-/* every service call while Blockz runs: keep the player inside /_blockgame/ */
+/* every service call while Blockz runs */
 static void bgm_poll(void)
 {
     if (M.status == BGM_SCAN) {                    /* card walk, a few sectors per call */
@@ -282,20 +303,17 @@ static void bgm_poll(void)
         if (r != BGM_SCAN) { M.status = (uint8_t)r; if (r == BGM_PLAY) bgm_play(); }
         return;
     }
-    if (!M.mine) return;
-    if (ThreadRunning(m_rd32(PHAND), PDESC) != 1) { M.mine = 0; M.status = BGM_ERRSTART; return; }
-    uint32_t c = *(volatile uint32_t *)(PREC + 0x34), n = *(volatile uint32_t *)(PREC + 0x38);
-    if (c == M.seen_clus && n == M.seen_num) return;
-    /* the player moved on by itself (track ended): next random track from the folder */
-    AudioClose();
-    point_record(pick_track());
-    AudioControl(0xE5, 0);
+    if (!M.mine || ThreadRunning(m_rd32(PHAND), PDESC) == 1) return;
+    /* the player stopped: after the last track in normal play mode, or on an error; reshuffle and go again */
+    M.mine = 0;
+    if (++M.restarts > 20) { M.status = BGM_ERRSTART; return; }
+    bgm_play();
 }
 
 /* on Blockz exit: stop what we started */
 static void bgm_stop(void)
 {
-    if (M.mine) ThreadDelete(PHAND);
+    if (M.mine) { ThreadDelete(PHAND); PLT->magic = 0; }
     M.mine = 0;
 }
 

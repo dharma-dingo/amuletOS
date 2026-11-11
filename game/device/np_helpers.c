@@ -41,3 +41,30 @@ void menu_np(void)
     menu_art();
     ((void (*)(uint32_t))(0x03067ED4u | 1))(0x2D);   /* repaint the card */
 }
+
+/* v0.3 M3U playlists: one step of the music source record (0x0305E930's entry, via np_stub.S pl_step_hook).
+ * Next, Prev and track end all come through here (docs/HARDWARE.md). While the record is still on the playlist's
+ * current entry (source 0x63 "files", cluster and number as in the table), move along the table and fill the
+ * record the way stock's lookups do; anything else (another playback started since) runs stock's step. */
+#include "pl_table.h"
+#define REC     0x03022F14u
+#define TICK10  (*(volatile uint32_t *)0x0302288Cu)
+
+uint32_t pl_step(uint8_t *rec, int32_t dir)
+{
+    pl_table_t *t = (pl_table_t *)PLT_BASE;            /* the player thread is the only user while it runs */
+    uint16_t *r16 = (uint16_t *)rec;
+    uint32_t *r32 = (uint32_t *)rec;
+    uint32_t n = t->n, i = t->cur;
+    if ((uint32_t)rec != REC || !dir || t->magic != PLT_MAGIC || r16[0xF2 / 2] != 0x63
+        || i >= n || n > PLT_MAX || r32[0x34 / 4] != t->clus[i] || r32[0x38 / 4] != t->num[i]) return 0;
+    if (r16[0x0C / 2] == 1 && n > 1) i += 1 + TICK10 % (n - 1);     /* shuffle: any other entry */
+    else i += dir > 0 ? 1 : n - 1;
+    if (i >= n) i -= n;
+    t->cur = (uint16_t)i;
+    r32[0x34 / 4] = t->clus[i];
+    r32[0x38 / 4] = t->num[i];
+    r16[0] = (uint16_t)n; r16[1] = r16[3] = (uint16_t)(i + 1);
+    r32[0x44 / 4] = r32[0x48 / 4] = r32[0x4C / 4] = 0;
+    return 1;
+}

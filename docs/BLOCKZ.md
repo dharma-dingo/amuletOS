@@ -198,6 +198,13 @@ Later the same day: the file number is the directory slot + 1 (Classic Theme: sl
 right, by luck: `pick_track` counts files and must use slots for multi-file folders). Likely missing step: Now
 Playing's init sets `*(u8 *)0x030483C8 = 1` (0x0308CFB8(1)) after starting the player; Blockz does not.
 
+**Build 35 (owner asked to try again):** the walk keeps each track's directory slot; `bgm_play` loads the tracks
+shuffled into the playlist table (pl_table.h) and starts the player exactly as Now Playing's init does (record as
+Folders, 0x0302283C = 0x46, ThreadDelete / ModuleOverlay(33) / ThreadCreate, then 0x030483C8 = 1). Track end goes
+through the playlist hook (np_helpers.c pl_step), so the player picks the next table entry itself; when it stops
+(after the last track in normal play mode) Blockz reshuffles and starts again (up to 20 times). INFO BX: sectors
+read, files, table entry.
+
 Earlier plan (superseded by the behaviour above):
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays

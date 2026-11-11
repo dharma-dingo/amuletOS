@@ -18,6 +18,7 @@ static uint32_t read_sec(uint32_t lba, void *b) { reads++; memcpy(b, disk[lba], 
 #define VOLI   ((uint32_t)(uintptr_t)vol)
 #define FILTER ((const void *)filter)
 
+#include "../device/pl_table.h"
 #include "../device/bgmusic.c"
 
 enum { PART = 100, FATS = 108, HEAP = 200, SHIFT = 2 };
@@ -116,15 +117,10 @@ int main(void)
     r = run_walk();
     CHECK(r == BGM_ERRFIND, "not exFAT: status %d", r);
 
-    card(1, 5);   /* track picks stay in 1..files and never repeat back to back */
+    card(1, 5);   /* file numbers are directory slot + 1: mp3 at slot 0, FLAC at 4, ogg at 13 (txt, noext between) */
     run_walk();
-    M.rnd = 12345; M.cur = 0;
-    for (int i = 0; i < 200; i++) {
-        uint32_t n = pick_track();
-        CHECK(n >= 1 && n <= M.files, "pick %u", n);
-        CHECK(n != M.cur, "repeat %u", n);
-        M.cur = n;
-    }
+    CHECK(M.files == 3 && M.nums[0] == 1 && M.nums[1] == 5 && M.nums[2] == 14,
+          "nums %u %u %u (files %u)", M.nums[0], M.nums[1], M.nums[2], M.files);
 
     printf(fails ? "test_bgwalk: %d FAILED\n" : "test_bgwalk: all passed\n", fails);
     return fails != 0;

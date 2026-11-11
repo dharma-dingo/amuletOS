@@ -131,6 +131,7 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
      (wrap, shuffle flag rec+0xC), fill +0x34 / +0x38 from the table, return 0; else stock. The flag goes off when
      Now Playing starts any other playback (np_load sees an arg without our tag).
   File number semantics confirmed 2026-11-11 (HARDWARE.md: directory slot + 1, not a count).
+  **Built in build 35** (HANDOFF row 35): playlists over 24 entries keep the first 24 (slot-2 room).
 - **Resume from the Now Playing card (idea, 2026-11-11):** after a reboot, stock's Music-menu "Now playing" resumes the last song from the saved resume point (sys+0x64, HARDWARE.md main menu notes). The carousel card could do the same instead of staying grey; not built.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 

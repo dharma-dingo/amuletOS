@@ -293,6 +293,7 @@ LIST_GLYPHS = {   # stock id (normal set; +10 = the highlighted set): glyph, col
     232: (["kkk.....", "kkkkkkkk", "k......k", "k......k", "k......k", "k......k", "kkkkkkkk", "........"], KIWI),   # Directory
     234: ([".kk..kk.", "kkkkkkkk", "kkkkkkkk", "kkkkkkkk", ".kkkkkk.", "..kkkk..", "...kk...", "........"], BERRY),  # Favorites
     235: (["..kkkkk.", ".k....kk", "k....kkk", "k.......", ".......k", "kkk....k", "kk....k.", ".kkkkk.."], INK),    # Update
+    236: (["kk.kkkkk", "kk.kkkkk", "........", "kk.kkkkk", "kk.kkkkk", "........", "kk.kkk..", "kk.kkk.."], GRAPE),  # Playlists
 }
 
 def list_icons():

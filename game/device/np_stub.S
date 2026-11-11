@@ -59,6 +59,7 @@ music_menu:
     .hword 0xE7, 0x55, 4      @ Genre
     .hword 0xE8, 0x57, 6      @ Directory List
     .hword 0xEA, 0x59, 7      @ Favorites (heart, build 34; stock used the folder)
+    .hword 0xEC, 0x56, 0x50   @ Playlists (text 86; action 0x50 -> pl_menu_exit, build 35)
     .hword 0xEB, 0x5A, 8      @ Update (refresh arrows, build 34)
 
 @ main menu key dispatch fallthrough (module 21 0x03081B8A, was "b.w exit"): r1 = event - 0x40000010.
@@ -72,4 +73,42 @@ menu_key_more:
     ldreq   r0, =0x03081BA7
     ldrne   r0, =0x03081D75
     bx      r0
+    .ltorg
+
+@ ---- v0.3 M3U playlists (build 35; tools/patch_code.py playlists) ----
+@ 0x0305E930 entry (one step of the music source record, r0 = record, r1 = direction), was
+@ "push.w {r3-r11, lr}": pl_step (np_helpers.c) handles playlist songs (return 0 = success, like stock's step).
+    .section .text.pl_step_hook
+    .global pl_step_hook
+    .thumb_func
+pl_step_hook:
+    push    {r0-r3, r12, lr}
+    bl      pl_step
+    cmp     r0, #0
+    pop     {r0-r3, r12, lr}
+    bne     1f
+    push.w  {r3, r4, r5, r6, r7, r8, r9, r10, r11, lr}
+    ldr     r12, =0x0305E935        @ stock's step after its push
+    bx      r12
+1:  movs    r0, #0
+    bx      lr
+    .ltorg
+
+@ Music menu select routine's exit (module 22 0x0308197E, was "add sp, #0x1c; mov r0, r5"): action 0x50 (the
+@ Playlists row) opens the Playlists screen, task 19 (module 86, game/device/playlists.c).
+    .section .text.pl_menu_exit
+    .global pl_menu_exit
+    .thumb_func
+pl_menu_exit:
+    cmp     r4, #0x50
+    bne     1f
+    movs    r1, #0
+    movs    r0, #19
+    ldr     r2, =0x030680D5         @ TaskSwitch(19, NULL)
+    blx     r2
+    movs    r5, #1
+1:  add     sp, #0x1c
+    mov     r0, r5
+    ldr     r2, =0x03081983         @ pop.w {r4-r11, pc}
+    bx      r2
     .ltorg
