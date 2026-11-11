@@ -251,7 +251,16 @@ out text wider than its current advances (clipping or scrolling).
   0x40000008 -> 0x03083E4C (previous); Right/Left repeat 0x30000004 / 0x30000008 -> 0x03083B24 / 0x03083BA8 (seek).
   Next: if sys+0x199 (a seek mode) is set, AudioControl(0xF2, step) twice (prev: 0xF3); else clear 0x030483CA,
   set 0x030483CC = 1 and 0x030360E8 = 1, then AudioControl(0x109) (prev presumably 0x10A). AudioControl (m33
-  0x0308BF84) is a command entry for the player thread; the next-file choice is further in (untraced).
+  0x0308BF84 = b.w 0x0308DBC2) switches on the command: 0x109 (next) -> 0x0308DD1C: AudioClose(1) (0x0308D86E),
+  0x03062858(), 0x0308CC50(1), 0x03062858(), Post(0x109); 0x10A (prev) -> 0x030625A2 (untraced).
+- 0x0308CC50(dir) (m33): play-mode switch on (*(0x030483D0 + 8))+0x1C (8 modes: repeat / shuffle; tbb), then
+  0x0305EDC6(0x03022F14, dir).
+- **0x0305EDC6(rec, n)** (resident, module 0): calls **0x0305E930(rec, +-1)** n times until it returns non-zero.
+  0x0305E930 = one step of the music source record 0x03022F14: rec+2 (u16) current index 1-based, rec+0 (u16) total
+  (wraps to 1), rec+0xC = 1: shuffle (random from the 10 ms tick, 0x03067D78(0x23)), rec+0xF2 source type: 0x63 ->
+  0x0305EA5A, 6 -> 0x0305EB2A (folder / card-wide file lookup that sets rec+0x34 cluster, rec+0x38 number).
+  **Playlist hook point:** branch at 0x0305E930's entry when rec+0xF2 is our playlist source type. Still to check:
+  that track end also goes through 0x0308CC50 / 0x0305EDC6, and what 0x030625A2 (prev) does.
 
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 

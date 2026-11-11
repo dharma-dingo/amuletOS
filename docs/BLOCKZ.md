@@ -187,6 +187,10 @@ root directory (FAT chain) -> the "_blockgame" folder entry set (name case-insen
 player's file number; true for the owner's one-file folder). FAT cards keep the old iterator path (untested).
 INFO rows now: BG = FS type, root cluster, folder cluster (expect 000A0C32); BX = sectors read, files, track.
 
+**Build 34 result (owner):** still no Blockz music. Tabled by the owner (2026-11-11). The MUSIC label and INFO BG/BX
+would say whether the walk failed (no 000A0C32 / no files) or the player start did (PLAY or ERR 2 with the right
+cluster); the second matters for M3U playlists, which start songs the same way.
+
 Earlier plan (superseded by the behaviour above):
 
 Play a track from storage on loop while the game runs, using stock's music engine (it stays
