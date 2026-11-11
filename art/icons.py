@@ -187,6 +187,37 @@ def r_settings():  # cog with red gem
     s.ring(11.5, 11.5, 3.3, 4.2, GOLD)
     return s
 
+def r_notes():  # two beamed eighth notes (v0.3 Music option A)
+    s = Sprite()
+    s.poly([(7, 4), (21, 1), (21, 5), (7, 8)], GOLD); s.line(7, 5, 20, 2, GOLD_HI)
+    s.rect(7, 6, 2, 13, GOLD_LO); s.rect(19, 3, 2, 13, GOLD_LO)
+    s.ellipse(5.5, 18.5, 3.6, 2.8, LAV); s.ellipse(17.5, 15.5, 3.6, 2.8, LAV)
+    s.put(4, 17, LAV_HI); s.put(16, 14, LAV_HI)
+    return s
+
+def r_note_disc():  # single eighth note on a sky disc (v0.3 Music option B)
+    s = Sprite()
+    s.ellipse(11.5, 11.5, 10.5, 10.5, SKY_LO); s.ellipse(11.5, 11.5, 9.5, 9.5, SKY); s.ellipse(9.5, 8.5, 4, 3, SKY_HI)
+    s.rect(12, 4, 2, 12, WHITE); s.poly([(13, 4), (18, 8), (18, 11), (13, 7)], WHITE)
+    s.ellipse(10.5, 16.5, 3.4, 2.6, GOLD); s.put(9, 15, GOLD_HI)
+    return s
+
+def r_headphones():  # headphones (v0.3 Music option C)
+    s = Sprite()
+    s.ring(11.5, 12, 8, 10, STEEL); s.clear(0, 12, 24, 12)
+    s.ring(11.5, 12, 9, 9.6, STEEL_HI); s.clear(0, 12, 24, 12)
+    s.rect(1, 12, 6, 9, LAV_LO); s.rect(2, 13, 4, 7, LAV); s.put(3, 14, LAV_HI)
+    s.rect(17, 12, 6, 9, LAV_LO); s.rect(18, 13, 4, 7, LAV); s.put(19, 14, LAV_HI)
+    return s
+
+def r_nowplaying():  # golden disc with a play mark (v0.3 carousel)
+    s = Sprite()
+    s.ellipse(11.5, 11.5, 10.5, 10.5, GOLD_LO); s.ellipse(11.5, 11.5, 9.5, 9.5, GOLD)
+    s.ellipse(11.5, 11.5, 7.5, 7.5, LAV_LO); s.ellipse(10.5, 10.5, 6, 6, LAV)
+    s.poly([(9, 7), (17, 12), (9, 17)], WHITE)
+    s.put(5, 5, GOLD_HI); s.put(6, 4, GOLD_HI); s.put(4, 6, GOLD_HI)
+    return s
+
 SETS = {
     "classic": [c_music, c_games, c_library, c_folders, c_bluetooth, c_settings],
     "relic": [r_music, r_games, r_library, r_folders, r_bluetooth, r_settings],

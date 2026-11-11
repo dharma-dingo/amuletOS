@@ -12,17 +12,18 @@ stock's time/battery text. 148x120 grid, scaled 2x.
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from zeal import Canvas, THEMES, W, H, mix, tw
-from icons import SETS, N
+from icons import SETS, N, r_nowplaying, r_note_disc, r_games, r_library
 from main_menu import panel, STATES
 
 BASE = THEMES["zeal"]
-ITEMS = [  # title, background pair (owner: titles only, no flavour text)
-    ("Music",   ("#acd2f4", "#8fbaec")),
-    ("Blockz",  ("#eef6f8", "#d4e8ee")),
-    ("Library", ("#d8cdf6", "#c2b2ee")),
-    ("Folders", ("#f4e2b8", "#e8cf98")),
-    ("BT",      ("#c6b2f4", "#ae96ea")),
-    ("Setup",   ("#c2e8de", "#a4d8cc")),
+# v0.3 one-level carousel (owner): Now Playing, Music, Blockz, Library; Start opens Settings.
+# Stock's menu index -> image: 0 -> 016, 1 -> 014, 2 -> 018, 3 -> 022 (main_menu.STATES); actions patched in
+# tools/patch_code.py menu_carousel.
+ITEMS = [  # title, background pair, icon (owner: titles only, no flavour text)
+    ("Now Playing", ("#acd2f4", "#8fbaec"), r_nowplaying),
+    ("Music",       ("#c2e8de", "#a4d8cc"), r_note_disc),   # owner: icon B (note on a disc)
+    ("Blockz",      ("#eef6f8", "#d4e8ee"), r_games),
+    ("Library",     ("#d8cdf6", "#c2b2ee"), r_library),
 ]
 
 def diamond(cv, a, b, y0):
@@ -43,14 +44,14 @@ def icon_at(cv, sprite, x, y, ink, scale=1, fade=None):
                 cv.rect(x + xx * scale, y + yy * scale, scale, scale, col)
 
 def screen(sel, t=BASE):
-    title, (b1, b2) = ITEMS[sel]
-    icons = [f() for f in SETS["relic"]]
+    title, (b1, b2), _ = ITEMS[sel]
+    n = len(ITEMS)
+    icons = [it[2]() for it in ITEMS]
     cv = Canvas()
     cv.rect(0, 0, W, 16, t["panel"]); cv.rect(0, 16, W, 1, t["border"])
     diamond(cv, b1, b2, 17)
-    # neighbours in the same row, faded, with arrows
-    row = sel // 3
-    left, right = row * 3 + (sel - 1) % 3, row * 3 + (sel + 1) % 3
+    # neighbours (the row wraps), faded, with arrows
+    left, right = (sel - 1) % n, (sel + 1) % n
     icon_at(cv, icons[left], 6, 35, t["border"], 1, fade=b1)
     icon_at(cv, icons[right], W - 6 - N, 35, t["border"], 1, fade=b1)
     cv.glyph([2, 6, 14, 30, 14, 6, 2], 33, 44, t["lavInk"])        # <
@@ -59,22 +60,23 @@ def screen(sel, t=BASE):
     px, py, pw, ph = 44, 19, 60, 56
     panel(cv, px, py, pw, ph, t, True)
     icon_at(cv, icons[sel], px + (pw - 2 * N) // 2, py + 4, t["text"], 2)
-    # title on a ribbon
-    cv.rect(24, 79, W - 48, 22, t["border"]); cv.rect(25, 80, W - 50, 20, t["panel"])
+    # title on a ribbon, inset from the rounded screen corners
+    rw = max(W - 48, tw(title, 2) + 12)
+    rx = (W - rw) // 2
+    cv.rect(rx, 79, rw, 22, t["border"]); cv.rect(rx + 1, 80, rw - 2, 20, t["panel"])
     cv.text(title, (W - tw(title, 2) + 1) // 2, 83, t["text"], 2)
-    # 2x3 position map
-    mx, my = (W - (3 * 6 - 2)) // 2, 107
-    for k in range(6):
-        x, y = mx + (k % 3) * 6, my + (k // 3) * 5
-        on = k == sel
-        cv.rect(x + 1, y, 2, 4, t["accent"] if on else t["border"])
-        cv.rect(x, y + 1, 4, 2, t["accent"] if on else t["border"])
+    # position: one dot per item in a row
+    mx, my = (W - (n * 6 - 2)) // 2, 107
+    for k in range(n):
+        x, on = mx + k * 6, k == sel
+        cv.rect(x + 1, my, 2, 4, t["accent"] if on else t["border"])
+        cv.rect(x, my + 1, 4, 2, t["accent"] if on else t["border"])
     return cv
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "build/art"
     os.makedirs(out, exist_ok=True)
-    for sel, idx in enumerate(STATES):
+    for sel, idx in enumerate(STATES[:len(ITEMS)]):
         screen(sel).image().save(os.path.join(out, f"{idx:03d}.png"))
     print("wrote art-book menu panels to", out)
 

@@ -144,10 +144,7 @@ def usb_screen(t=T_SKY):
     cv.rect(26, 56, 18, 10, STEEL); cv.rect(26, 56, 18, 2, "#dfe6f4"); cv.rect(44, 58, 8, 6, "#cfd6e4")
     cv.rect(46, 59, 2, 1, t["border"]); cv.rect(49, 59, 2, 1, t["border"])
     cv.rect(10, 60, 16, 2, t["dim"])
-    # arrow
-    for k in range(5):
-        cv.rect(62 + k, 61 - k // 2, 1, 1 + k, t["accent"])
-    cv.rect(56, 60, 7, 3, t["accent"])
+    # (no arrow between plug and computer: owner, 2026-11-07)
     # computer
     cv.rect(80, 40, 52, 36, t["text"]); cv.rect(82, 42, 48, 32, t["bg1"]); cv.rect(82, 42, 48, 4, t["lav"])
     cv.rect(100, 76, 12, 6, t["dim"]); cv.rect(92, 82, 28, 3, t["dim"])

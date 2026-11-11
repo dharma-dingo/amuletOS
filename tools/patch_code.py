@@ -158,7 +158,45 @@ def np_v4():
          (thumb_bl(0x03083208, u["np_progress"]) + thumb_bw(0x0308320C, 0x030833DA)).hex()),  # progress bar
     ]
 
-GENERATED = {"np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
+def menu_carousel():
+    """v0.3 one-level main menu (module 21): items 0 Now Playing, 1 Music, 2 Blockz, 3 Library (art/menu_panels.py);
+    Left/Right wrap over four, Up/Down do nothing, Start opens Settings (Setup page), position kept in RAM by the
+    slot-2 stubs (np_stub.S). Use with menu_games_to_blockz (item 2 runs the old Games action, task 15)."""
+    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    T = 0x030818B4                                   # tbb table of the tile action routine 0x0308188E
+    tb = lambda a: (a - T) // 2
+    np_handler = (bytes.fromhex("00210320") + thumb_bl(0x030819D4, 0x030680D4)
+                  + bytes.fromhex("07b00120bde8f08300bf00bf"))        # TaskSwitch(3, 0); return 1
+    return [
+        (21, T, "035661718e84", bytes([tb(0x030819D0), tb(0x030818BA), tb(0x03081960), tb(0x03081976),
+                                      tb(0x03081996), tb(0x030819BC)]).hex()),
+        (21, 0x030819D0, "adf8001069460a20e6f77cfb07b00120bde8f083", np_handler.hex()),  # old item 4 -> Now Playing
+        (21, 0x03081CF8, "b8f80000032808d2401c80b2a8f80000",                             # Right: +1 of 4
+         (bytes.fromhex("0120") + thumb_bl(0x03081CFA, h["menu_step"]) + thumb_b16(0x03081CFE, 0x03081CD6)
+          + bytes.fromhex("00bf") * 4).hex()),
+        (21, 0x03081D24, "b8f80000032888bf401e08bf0520dad2002800e0",                     # Left: -1 of 4
+         (bytes.fromhex("0320") + thumb_bl(0x03081D26, h["menu_step"]) + thumb_b16(0x03081D2A, 0x03081CD6)
+          + bytes.fromhex("00bf") * 6).hex()),
+        (21, 0x03081CDE, "b8f8", thumb_b16(0x03081CDE, 0x03081D74).hex()),               # Up/Down: nothing
+        (21, 0x03081BA6, "4ff4bd70e6f793f9e849d9f80000d6f762f8",                         # Start: Settings page 4
+         (bytes.fromhex("0420adf8000069460a20") + thumb_bl(0x03081BB0, 0x030680D4)
+          + bytes.fromhex("0126") + thumb_b16(0x03081BB6, 0x03081D74)).hex()),
+        (21, 0x030815D4, "21780180", thumb_bl(0x030815D4, h["menu_idx_init"]).hex()),    # init: our position
+    ]
+
+def music_update():
+    """Music menu (module 22) gets an eighth item, "Update", running stock's index-8 library update, forced past
+    the fingerprint check (libscan.c lib_force). The 8-entry table lives in slot 2 (np_stub.S music_menu)."""
+    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    t = struct.pack("<I", h["music_menu"]).hex()
+    return [
+        (22, 0x03081B28, "483b0203", t), (22, 0x03081F6C, "483b0203", t), (22, 0x03082174, "483b0203", t),
+        (22, 0x0308165A, "072604462e70", "082604462e70"),          # 8 items
+        (22, 0x030816EC, "0728ccbf2e712871", "0728c8bf07202871"),  # still 7 rows per page
+        (22, 0x030818D8, "a7f84290", thumb_bl(0x030818D8, h["lib_force"]).hex()),
+    ]
+
+GENERATED = {"menu_carousel": menu_carousel, "music_update": music_update, "np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)
