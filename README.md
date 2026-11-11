@@ -112,6 +112,11 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
 - **Stronger shimmer (owner asked, 2026-11-11; on hold):** options previewed in build/shimmer: A a still foil band (full-colour dots plus a light rainbow wash in a diagonal band, baked into the images), B a band sweeping across every few seconds on screens our code drives, C the whole dot grid cycling colour. Owner: hold off for now.
 - **Boot version (owner, 2026-11-11):** the boot splash shows the current version and is updated as we go (`art/boot_splash.py OUTDIR VERSION`); builds 30/31 still showed v0.1, next build shows v0.3.
 - **Song lists (owner, 2026-11-07, future):** at song level, stock's music navigation shows file names. Show the title tag instead (file name only when there is no tag), sorted by disc number, then track number, then file name.
+- **Name: amuletOS (owner, 2026-11-11):** "amulet" lowercase, after Schala's / Marle's pendant (the owner's
+  translucent teal AP30 looks like it); replaces SchalaOS. Boot splash: option A (the existing art and gem, white
+  name; `art/boot_splash.py` default). Still to rename after build 35's test: code and docs, the USB vendor name
+  (SCHALAOS -> AMULETOS, 8 characters; `tools/inquiry.py` checks it), the Notion spec, and the GitHub repo
+  (rename dharma-dingo/schala-os, keeping history; owner's OK first).
 - **M3U playlists (owner, 2026-11-11, next feature):** playlists already on the card in `/_Playlists/` (16 extended
   M3U8 files from the media drive F:\Listen\_Playlists: UTF-8, LF, `#EXTM3U` / `#PLAYLIST:` / `#EXTINF:-1,Title`
   lines, entries relative like `../Artist/Album/01 - Song.mp3`; 215 entries, 214 MP3 + 1 FLAC, all resolve, one
