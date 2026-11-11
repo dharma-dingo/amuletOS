@@ -245,6 +245,14 @@ out text wider than its current advances (clipping or scrolling).
   5 -> 6, 0..4 tbb, 6, 7 Favorites, 8 = library update (0x030818BE: stop player, sys+0x42 = 1, TaskSwitch(13, {1})),
   9, 0x64. Stock ships no entry for 8; text 90 "Update" unused.
 
+## Now Playing keys (module 27, traced 2026-11-11)
+
+- Service 0x03083688 switches on GetKey's event: Right press 0x40000004 -> 0x03083DCC (next), Left press
+  0x40000008 -> 0x03083E4C (previous); Right/Left repeat 0x30000004 / 0x30000008 -> 0x03083B24 / 0x03083BA8 (seek).
+  Next: if sys+0x199 (a seek mode) is set, AudioControl(0xF2, step) twice (prev: 0xF3); else clear 0x030483CA,
+  set 0x030483CC = 1 and 0x030360E8 = 1, then AudioControl(0x109) (prev presumably 0x10A). AudioControl (m33
+  0x0308BF84) is a command entry for the player thread; the next-file choice is further in (untraced).
+
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
 - **sys +0x42 = "library needs update"**, set by: boot config load (m1 0x03082784 / 0x03082798: when the saved

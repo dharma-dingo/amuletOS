@@ -112,6 +112,18 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
 - **Stronger shimmer (owner asked, 2026-11-11; on hold):** options previewed in build/shimmer: A a still foil band (full-colour dots plus a light rainbow wash in a diagonal band, baked into the images), B a band sweeping across every few seconds on screens our code drives, C the whole dot grid cycling colour. Owner: hold off for now.
 - **Boot version (owner, 2026-11-11):** the boot splash shows the current version and is updated as we go (`art/boot_splash.py OUTDIR VERSION`); builds 30/31 still showed v0.1, next build shows v0.3.
 - **Song lists (owner, 2026-11-07, future):** at song level, stock's music navigation shows file names. Show the title tag instead (file name only when there is no tag), sorted by disc number, then track number, then file name.
+- **M3U playlists (owner, 2026-11-11, next feature):** playlists already on the card in `/_Playlists/` (16 extended
+  M3U8 files from the media drive F:\Listen\_Playlists: UTF-8, LF, `#EXTM3U` / `#PLAYLIST:` / `#EXTINF:-1,Title`
+  lines, entries relative like `../Artist/Album/01 - Song.mp3`; 215 entries, 214 MP3 + 1 FLAC, all resolve, one
+  non-ASCII path, longest 133 chars). Owner's choices: a **"Playlists" row in the Music menu** (stock text 86
+  "Playlists" exists, unused) and **picking a playlist plays from track 1** in Now Playing; Next/Prev and track end
+  move through the playlist in order. Stock has no M3U support. Plan: (1) trace how the player picks the next file
+  (Now Playing Next = AudioControl(0x109), Prev likely 0x10A, m27 0x03083DCC / 0x03083E4C; the index -> (folder
+  cluster, file number) step is untraced) and how a source type could route it to us; (2) Playlists screen as our
+  own module (list of /_Playlists/*.m3u*, Pocket list look); (3) resolve an entry by walking the exFAT path from the
+  playlist folder (Blockz's walk, build 34) and start it like Blockz does; (4) resident hook for next / prev / track
+  end; keep RAM small (playlist location + line index, re-read on each track change). Depends on build 34 confirming
+  that the file number counts audio files in folder order.
 - **Resume from the Now Playing card (idea, 2026-11-11):** after a reboot, stock's Music-menu "Now playing" resumes the last song from the saved resume point (sys+0x64, HARDWARE.md main menu notes). The carousel card could do the same instead of staying grey; not built.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 
