@@ -1,26 +1,7 @@
-@ Now Playing mode-1 scrolling-line draw (module 27 0x03083466): same as the original sequence but
-@ with the title (file name fallback) instead of the long file name. Uses the caller's sp, r4, r8,
-@ so it stays in assembly. Lives in the slot-2 helper blob with np_helpers.c.
+@ Slot-2 assembly helpers (main menu carousel, Music menu table), linked with np_helpers.c and libscan.c.
+@ (The v0.2 np_title_draw stub was removed in build 33 with the other v0.2 Now Playing helpers.)
     .syntax unified
     .thumb
-    .equ TITLE, 0x030485E0
-    .equ DRAW,  0x03063F76
-
-    .section .text.np_title_draw
-    .global np_title_draw
-    .thumb_func
-np_title_draw:
-    push    {r4, lr}
-    bl      np_title_fill
-    pop     {r4, lr}
-    add     r1, sp, #8              @ caller's rect (sp is the caller's again after the pop)
-    strh.w  r4, [r8]                @ caller's colour store
-    movs    r3, #2
-    ldr     r2, =TITLE
-    mov     r0, r1
-    ldr     ip, =DRAW + 1
-    bx      ip                      @ tail call: returns to the caller
-    .ltorg
 
 @ ---- v0.3 one-level carousel (main menu, module 21; tools/patch_code.py menu_carousel) ----
 @ The carousel position is kept here across screens (0x0309FFE4, above slot 2): stock passes its own tile
@@ -34,6 +15,7 @@ np_title_draw:
     .global menu_idx_init
     .thumb_func
 menu_idx_init:
+    push    {r0, lr}
     ldr     r1, =MENU_RAM
     ldr     r1, [r1]
     lsrs    r2, r1, #8
@@ -41,9 +23,10 @@ menu_idx_init:
     cmp     r2, r3
     ite     eq
     andeq   r1, r1, #3
-    movne   r1, #0
+    movne   r1, #1                  @ fresh boot: Music (owner, build 33)
     strh    r1, [r0]
-    bx      lr
+    bl      menu_art                @ grey Now Playing unless the player runs
+    pop     {r0, pc}
     .ltorg
 
 @ Left / Right: r0 = 3 (back) or 1 (on); four items, wrapping

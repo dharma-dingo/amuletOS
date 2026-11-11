@@ -40,7 +40,7 @@ def main():
     elf, bin_ = os.path.join(work, "helpers.elf"), os.path.join(work, "helpers.bin")
     run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
         "-fno-tree-loop-distribute-patterns", "-ffunction-sections", "-Wall", "-Wextra", "-Wno-unused-parameter",
-        f"-Wl,-Ttext={at_run:#x}", "-Wl,-e,np_artist", "-Wl,--no-warn-rwx-segments",
+        f"-Wl,-Ttext={at_run:#x}", "-Wl,-e,np_load", "-Wl,--no-warn-rwx-segments",
         "-Wl,-Map=" + os.path.join(work, "helpers.map"), "-o", elf, *sources)
     sizes = {f[0]: int(f[1], 16) for f in (l.split() for l in run(tool("size"), "-A", "-x", elf).splitlines())
              if len(f) == 3 and f[0].startswith(".")}

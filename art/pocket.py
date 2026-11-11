@@ -109,11 +109,18 @@ def _blockz():
     return ["".join(r) for r in g]
 BLOCKZ = _blockz()
 
-def icon(cv, rows, x, y, k=1, fade=0.0):
+def grey(c):
+    r, g, b = rgb(c)
+    v = round(0.3 * r + 0.59 * g + 0.11 * b)
+    return (v, v, v)
+
+def icon(cv, rows, x, y, k=1, fade=0.0, off=False):
+    """off: greyed out (unavailable item)"""
     for r, row in enumerate(rows):
         for c, ch in enumerate(row):
             if ch in PAL:
-                cv.rect(x + c * k, y + r * k, k, k, mix(PAL[ch], WHITE, fade) if fade else PAL[ch])
+                col = grey(PAL[ch]) if off else PAL[ch]
+                cv.rect(x + c * k, y + r * k, k, k, mix(col, WHITE, fade) if fade else col)
 
 # ---------- main menu carousel (stock index -> image 016, 014, 018, 022) ----------
 ITEMS = [("Now Playing", NOW_PLAYING, GRAPE), ("Music", MUSIC, SKY), ("Blockz", BLOCKZ, GOLD), ("Library", LIBRARY, BERRY)]
@@ -125,21 +132,27 @@ def chevron(cv, x, y, left):
             cx = (2 - c) if left else c
             cv.rect(x + cx * 2, y + r * 2, 2, 2, INK)
 
-def menu_card(sel):
+OFF_INK, OFF_ACCENT = "#a9adb8", "#c9ccd6"
+GREY_STATES = {0: 8, 1: 20, 3: 24}   # Now Playing greyed (nothing loaded): stock's unused grid image 8, tiles 4/5
+
+def menu_card(sel, np_off=False):
+    """np_off: the Now Playing item is greyed out (player not running; np_helpers.c menu_art picks these)"""
     title, ic, accent = ITEMS[sel]
     n = len(ITEMS)
+    off = np_off and sel == 0
     cv = Canvas(W, H)
     screen(cv, 34)
     status(cv)
-    icon(cv, ITEMS[(sel - 1) % n][1], 22, 70, 2, fade=0.58)
-    icon(cv, ITEMS[(sel + 1) % n][1], W - 22 - 32, 70, 2, fade=0.58)
+    for d, x in ((-1, 22), (1, W - 22 - 32)):
+        j = (sel + d) % n
+        icon(cv, ITEMS[j][1], x, 70, 2, fade=0.72 if np_off and j == 0 else 0.58, off=np_off and j == 0)
     chevron(cv, 76, 80, True); chevron(cv, W - 76 - 6, 80, False)
-    frame(cv, 96, 36, 104, 104, WHITE, accent)
-    icon(cv, ic, 96 + 12, 36 + 12, 5)
-    text_c(cv, title, 152, INK, 2)
+    frame(cv, 96, 36, 104, 104, WHITE, OFF_ACCENT if off else accent)
+    icon(cv, ic, 96 + 12, 36 + 12, 5, fade=0.45 if off else 0.0, off=off)
+    text_c(cv, title, 152, OFF_INK if off else INK, 2)
     x0 = (W - (n * 6 + (n - 1) * 6)) // 2
     for k in range(n):
-        cv.rect(x0 + k * 12, 196, 6, 6, accent if k == sel else "#c9ccd6")
+        cv.rect(x0 + k * 12, 196, 6, 6, (OFF_INK if off else accent) if k == sel else "#c9ccd6")
     return cv
 
 # ---------- Now Playing (026) and its cover placeholder (277) ----------
@@ -273,7 +286,8 @@ def main():
     save = lambda cv, i: cv.image(1).save(out / f"{i:03d}.png")
     for sel, idx in enumerate(STATES):
         save(menu_card(sel), idx)
-    save(menu_card(0), 20); save(menu_card(1), 24)        # stock's tiles 4/5: not reachable any more
+    for sel, idx in GREY_STATES.items():                  # 8 unused by stock; 20 / 24 = old tiles 4 / 5
+        save(menu_card(sel, np_off=True), idx)
     save(now_playing(), 26); save(default_art(), 277)
     save(strip(128), 69); save(strip(296), 28)
     save(list_bg(), 159); save(selection_bar(296), 184); save(selection_bar(255), 185); save(plain_bg(), 89)

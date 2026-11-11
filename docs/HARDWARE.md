@@ -234,7 +234,12 @@ out text wider than its current advances (clipping or scrolling).
   through to the exit at 0x03081B8A. Event types: 0x40 press, 0x30 repeat; 0x20 seen with Start's code (not a
   plain press). Tile actions 0x0308188E (tbb at 0x030818B4): 0 Music (task 1), 1 Games (task 10 page 7), 2 Browser
   mode 3 (task 9), 3 Browser mode 5 (Folders), 4 / 5 task 10 pages 3 (Bluetooth) / 4 (Setup). Init restores the
-  index from its argument byte (or 3 when 0x03005984 == 3). Tile table in the data: {1, i, i, 0, image, text id}.
+  index from its argument byte (or 3 when 0x03005984 == 3). Tile table in the data: {1, i, i, 0, image, text id}. The table is at 0x03023B64 (RAM, 6 x 8 B) and the card
+  paint (0x03081E5E, on msg 0x2D) reads the image id from it each time, so swapping ids in RAM changes the card
+  (build 33 greys Now Playing this way). Image 14's top 33 rows are also the header backdrop of many screens
+  (drawn by modules 9, 21, 22, 23, 27, 31, 32); images 8, 20, 24 have no stock draws left (8 had none at all).
+  Stock's Music-menu "Now playing" (m22 0x030817D0): player running -> TaskSwitch(3) back to it; else if sys+0x64
+  (resume point) -> rebuild the music source record from the config and TaskSwitch(3); else open All Music.
 - Music menu (module 22): table {icon image, text id, action} at data 0x03023B48 (7 entries, window descriptor
   right after at 0x03023B74); count 7 at 0x0308165A, 7 rows per page; select 0x0308170C dispatches on the action:
   5 -> 6, 0..4 tbb, 6, 7 Favorites, 8 = library update (0x030818BE: stop player, sys+0x42 = 1, TaskSwitch(13, {1})),

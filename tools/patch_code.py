@@ -91,8 +91,10 @@ SRC_DIR = None   # set by main: generated patches may read SRC_DIR/helpers.json 
 
 def np_v2():
     """Now Playing with the slot-2 helpers (game/device/np_helpers.c): artist wraps onto line 2,
-    album moves to line 3 (genre gone), scrolling line shows the title with file-name fallback."""
+    album moves to line 3 (genre gone), scrolling line shows the title with file-name fallback.
+    Retired: its helpers were removed from slot 2 in build 33 (restore them from git e86d06a to use this)."""
     h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    assert "np_artist" in h, "np_v2/np_v3 need the v0.2 slot-2 helpers (removed in build 33; see git e86d06a)"
     nop = bytes.fromhex("00bf")
     return [
         (27, 0x03082A2A, "e1f7a4fa", thumb_bl(0x03082A2A, h["np_artist"]).hex()),          # line 1: artist, 2 lines
@@ -165,8 +167,8 @@ def menu_carousel():
     h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
     T = 0x030818B4                                   # tbb table of the tile action routine 0x0308188E
     tb = lambda a: (a - T) // 2
-    np_handler = (bytes.fromhex("00210320") + thumb_bl(0x030819D4, 0x030680D4)
-                  + bytes.fromhex("07b00120bde8f08300bf00bf"))        # TaskSwitch(3, 0); return 1
+    np_handler = (thumb_bl(0x030819D0, h["menu_np"])                  # Now Playing if the player runs; return 1
+                  + bytes.fromhex("07b00120bde8f08300bf00bf00bf00bf"))
     return [
         (21, T, "035661718e84", bytes([tb(0x030819D0), tb(0x030818BA), tb(0x03081960), tb(0x03081976),
                                       tb(0x03081996), tb(0x030819BC)]).hex()),
