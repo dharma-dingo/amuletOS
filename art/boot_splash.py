@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Boot splash (stock image 000) and goodbye screen (002) for SchalaOS.
+"""Boot splash (stock image 000) and goodbye screen (002) for amuletOS (named SchalaOS until 2026-11-11).
 
-  python art/boot_splash.py OUTDIR [VERSION]     (VERSION shown bottom right, e.g. v0.3; owner: keep it current)
+  python art/boot_splash.py OUTDIR [VERSION] [--gem teal]   (VERSION bottom right, e.g. v0.3; owner: keep it current)
+
+--gem teal: the pendant gem in a teal close to the owner's translucent teal AP30 shell (design option B);
+--name-teal: the name in that teal too (option C).
 
 
 Ported from the mockup's drawBoot(): sky-kingdom starfield, four floating islands
 (one with a mountain and waterfall), lavender cloud bank, the gold-set pendant gem,
-and "SchalaOS". Single still frame. Output: 296x240 PNGs.
+and the OS name. Single still frame. Output: 296x240 PNGs.
 
   python art/boot_splash.py OUTDIR
 """
@@ -61,7 +64,10 @@ def island(cv, t, i, f):
             if (k + (f >> 1)) % 4 == 0: continue
             cv.rect(wx, cy + 2 + k, 1, 1, mix(t["panel"], t["border"], k / 16))
 
-def scene(t, f=0):
+NAME = "amuletOS"          # owner, 2026-11-11: "amulet" lowercase (after Schala's / Marle's pendant; was SchalaOS)
+GEM_TEAL = "#4cc3cf"        # near the owner's translucent teal AP30 shell
+
+def scene(t, f=0, gem=None, name_teal=False):
     cv = Canvas()
     cv.rect(0, 0, W, H, t["border"])
     for i in range(40):
@@ -76,25 +82,29 @@ def scene(t, f=0):
     for x in range(0, W, 2):
         h = 4 + jsround(3 * math.sin((x - f) / 7)); cv.rect(x, H - h - 6, 2, h + 6, t["bg1"])
     gx, gy, glint = 67, 18, (f % 40) < 4
-    gc = {"g": t["accent"], "H": "#ffffff" if glint else mix(t["bg1"], "#ffffff", 0.6), "h": t["bg1"],
-          "d": mix(t["bg2"], t["border"], 0.45)}
+    face, deep = (GEM_TEAL, mix(GEM_TEAL, t["border"], 0.45)) if gem == "teal" else (t["bg1"], mix(t["bg2"], t["border"], 0.45))
+    gc = {"g": t["accent"], "H": "#ffffff" if glint else mix(face, "#ffffff", 0.6), "h": face, "d": deep}
     for r, row in enumerate(GEM):
         for c, k in enumerate(row):
             if k != ".": cv.rect(gx + c, gy + r, 1, 1, gc[k])
-    title = "SchalaOS"
-    cv.text(title, (W - tw(title, 2) + 1) // 2, 44, t["panel"], 2)
+    title = NAME
+    cv.text(title, (W - tw(title, 2) + 1) // 2, 44, GEM_TEAL if name_teal else t["panel"], 2, keep_case=True)
     return cv
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else "build/art"
-    ver = sys.argv[2] if len(sys.argv) > 2 else "v0.3"
+    name_teal = "--name-teal" in sys.argv
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    gem = sys.argv[sys.argv.index("--gem") + 1] if "--gem" in sys.argv else None
+    if gem: args = [a for a in args if a != gem]
+    out = args[0] if args else "build/art"
+    ver = args[1] if len(args) > 1 else "v0.3"
     os.makedirs(out, exist_ok=True)
     t = THEMES["zeal"]
-    boot = scene(t)
+    boot = scene(t, gem=gem, name_teal=name_teal)
     # rounded bezel: keep corner text well inside (owner saw v0.1 clipped at 3 px)
     boot.text(ver, W - tw(ver) - 12, H - 14, t["border"])
     boot.image().save(os.path.join(out, "000.png"))
-    bye = scene(t)
+    bye = scene(t, gem=gem)
     msg = "Goodbye"
     bye.text(msg, (W - tw(msg) + 1) // 2, 64, t["accent"])
     bye.image().save(os.path.join(out, "002.png"))

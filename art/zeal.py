@@ -55,15 +55,20 @@ class Canvas:
                 if g[r] & (16 >> col):
                     self.rect(x + col * s, y + r * s, s, s, c)
 
-    def text(self, s, x, y, c, scale=1):
-        for ch in s.upper():
-            self.glyph(F.get(ch, F["?"]), x, y, c, scale)
+    def text(self, s, x, y, c, scale=1, keep_case=False):
+        """keep_case: draw the lowercase glyphs in FL where there is one (else the capital); default all caps"""
+        for ch in (s if keep_case else s.upper()):
+            self.glyph(FL.get(ch) or F.get(ch.upper(), F["?"]), x, y, c, scale)
             x += 6 * scale
         return x
 
     def image(self, scale=2):
         im = Image.fromarray(self.px)
         return im.resize((self.w * scale, self.h * scale), Image.NEAREST) if scale != 1 else im
+
+# lowercase 5x7 glyphs (x-height 5 rows), only the ones the OS name needs ("amuletOS", owner 2026-11-11)
+FL = {"a": [0, 0, 14, 1, 15, 17, 15], "m": [0, 0, 26, 21, 21, 21, 21], "u": [0, 0, 17, 17, 17, 19, 13],
+      "l": [12, 4, 4, 4, 4, 4, 14], "e": [0, 0, 14, 17, 31, 16, 14], "t": [8, 8, 28, 8, 8, 9, 6]}
 
 def tw(s, scale=1):
     return len(s) * 6 * scale - scale
