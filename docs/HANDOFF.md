@@ -77,7 +77,8 @@ mkdir build/art_v01_all; cp build/art_v01_auto/*.png build/art_v01_all/; cp buil
 # v0.3 Pocket look (build 30+): replaces art_v01_all, keeps the v0.1 boot/shutdown images
 python art/pocket.py build/art_pocket build/v029
 python art/recolor.py build/img_stock build/art_pocket build/art_pocket_auto pocket
-mkdir build/art_pocket_all; cp build/art_pocket_auto/*.png build/art_pocket/*.png build/art_pocket_all/; cp build/art_v01/000.png build/art_v01/002.png build/art_pocket_all/
+mkdir build/art_pocket_all; cp build/art_pocket_auto/*.png build/art_pocket/*.png build/art_pocket_all/; python art/boot_splash.py build/art_boot v0.3                  # boot/shutdown keep the v0.1 scene; version kept current
+cp build/art_boot/000.png build/art_boot/002.png build/art_pocket_all/
 python tools/build_helpers.py build/d1 build/d1h game/device/np_helpers.c game/device/np_stub.S game/device/libscan.c
 python tools/build_overlay.py build/d1h build/d1h_o game/device/npui.c --slot 28 --run 0x03083F0C --max 0x758 --at 0x5B400 --json npui.json
 python tools/patch_code.py build/d1h_o build/d1h_np np_v4,np_hide_format,menu_games_to_blockz,lib_skip,menu_carousel,music_update

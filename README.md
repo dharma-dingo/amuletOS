@@ -109,6 +109,8 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
   Observed 2026-11-07 (build 25): no scan at power-on that time; it started when Music was opened.
   **Step 1 done in build 27** (not yet on device): fingerprint skip, docs/HARDWARE.md "Library update trigger and scan skip". Until step 2 exists, a manual rebuild is Folders > other disk > Yes, then back to the SD card > Yes.
 - **USB screen (owner, 2026-11-07):** remove the orange shape in the middle of the USB connected screen (image 003, `art/screens.py` usb_screen: most likely the accent-coloured arrow between the plug and the computer). The rest of the screen stays as is.
+- **Stronger shimmer (owner asked, 2026-11-11; on hold):** options previewed in build/shimmer: A a still foil band (full-colour dots plus a light rainbow wash in a diagonal band, baked into the images), B a band sweeping across every few seconds on screens our code drives, C the whole dot grid cycling colour. Owner: hold off for now.
+- **Boot version (owner, 2026-11-11):** the boot splash shows the current version and is updated as we go (`art/boot_splash.py OUTDIR VERSION`); builds 30/31 still showed v0.1, next build shows v0.3.
 - **Song lists (owner, 2026-11-07, future):** at song level, stock's music navigation shows file names. Show the title tag instead (file name only when there is no tag), sorted by disc number, then track number, then file name.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 

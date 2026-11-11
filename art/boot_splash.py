@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Boot splash (stock image 000) and goodbye screen (002) for SchalaOS v0.1.
+"""Boot splash (stock image 000) and goodbye screen (002) for SchalaOS.
+
+  python art/boot_splash.py OUTDIR [VERSION]     (VERSION shown bottom right, e.g. v0.3; owner: keep it current)
+
 
 Ported from the mockup's drawBoot(): sky-kingdom starfield, four floating islands
 (one with a mountain and waterfall), lavender cloud bank, the gold-set pendant gem,
@@ -84,11 +87,12 @@ def scene(t, f=0):
 
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "build/art"
+    ver = sys.argv[2] if len(sys.argv) > 2 else "v0.3"
     os.makedirs(out, exist_ok=True)
     t = THEMES["zeal"]
     boot = scene(t)
     # rounded bezel: keep corner text well inside (owner saw v0.1 clipped at 3 px)
-    boot.text("v0.1", W - tw("v0.1") - 12, H - 14, t["border"])
+    boot.text(ver, W - tw(ver) - 12, H - 14, t["border"])
     boot.image().save(os.path.join(out, "000.png"))
     bye = scene(t)
     msg = "Goodbye"
