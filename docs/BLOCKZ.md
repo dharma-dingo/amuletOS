@@ -194,6 +194,9 @@ Owner's reading: MUSIC went SCAN, then PLAY, and nothing played. So the card wal
 and the player thread is running (else ERR 2): the failure is in starting playback our way (record + ThreadCreate
 with arg {1, 0x46}), not in finding the file. Folders playback, which works, instead fills the record and does
 TaskSwitch(3, {index, 0x46}) so Now Playing's init starts the player.
+Later the same day: the file number is the directory slot + 1 (Classic Theme: slot 0 -> 1, so build 34's number was
+right, by luck: `pick_track` counts files and must use slots for multi-file folders). Likely missing step: Now
+Playing's init sets `*(u8 *)0x030483C8 = 1` (0x0308CFB8(1)) after starting the player; Blockz does not.
 
 Earlier plan (superseded by the behaviour above):
 

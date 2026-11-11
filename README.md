@@ -122,7 +122,7 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
   1. **Playlists screen**: our own module in a free game slot (task 14, old Snake), opened by the new Music row:
      lists `/_Playlists/*.m3u*` (exFAT walk from Blockz, build 34), Pocket list look, Up/Down/A/B.
   2. **Resolve on pick**: parse the file, resolve each entry by walking its path from `/_Playlists/`: folder
-     cluster + file number (audio files counted in folder order; to confirm) into a table in slot-2 RAM
+     cluster + file number (= the file entry's directory slot + 1, confirmed) into a table in slot-2 RAM
      (6 B per entry, about 48 entries fit; playlists are at most 20).
   3. **Start like Folders**: stock's record prep, source 0x63 ("files", tags read from the file), record +0x34 /
      +0x38 = entry 1, +0 = count, +2 = 1, playlist flag on; TaskSwitch(3, {1, 0x46, our tag}) so Now Playing's
@@ -130,8 +130,7 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
   4. **One hook for Next / Prev / track end**: 0x0305E930's entry: when the playlist flag is on, step the index
      (wrap, shuffle flag rec+0xC), fill +0x34 / +0x38 from the table, return 0; else stock. The flag goes off when
      Now Playing starts any other playback (np_load sees an arg without our tag).
-  Test to run first: is the record's file number the audio-file index in folder order (Blockz INFO row CL while a
-  known track plays).
+  File number semantics confirmed 2026-11-11 (HARDWARE.md: directory slot + 1, not a count).
 - **Resume from the Now Playing card (idea, 2026-11-11):** after a reboot, stock's Music-menu "Now playing" resumes the last song from the saved resume point (sys+0x64, HARDWARE.md main menu notes). The carousel card could do the same instead of staying grey; not built.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 

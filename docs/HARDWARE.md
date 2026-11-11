@@ -275,6 +275,12 @@ out text wider than its current advances (clipping or scrolling).
   0x03081774(arg) = if the player thread is not running: ThreadDelete(0x030232BC), ModuleOverlay(33, 7),
   ThreadCreate(0x030232BC, 0x030361A4, arg); then **0x0308CFB8(1) = `*(u8 *)0x030483C8 = 1`** (first byte of the
   engine's state, m33 ZI). Blockz's own start (builds 25-34) skips that store: likely why it played nothing.
+- **File number = directory entry slot + 1** (checked 2026-11-11 on the owner's card, read raw on the PC): the
+  record's +0x38 (and library DB record +4) is the 32-byte slot index of the file's 0x85 entry in its folder, plus
+  1, counting deleted entries too; the open (0x030598E6, "clus = %d, index = %d") takes +0x38 - 1. Owner's card:
+  /Big Star/#1 Record/ = cluster 0x000815CE, "04 - Thirteen" at slot 4 -> 5 (Blockz INFO CL 000815CE 00000005),
+  while it is the 1st live file (Windows' listing) and 4th by name; /_blockgame/Classic Theme.mp3 at slot 0 -> 1.
+  The card's folders are full of deleted Syncthing sync-conflict entries, so slot != file count.
 
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
