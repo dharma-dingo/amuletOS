@@ -213,3 +213,9 @@ Owner (build 28): the Sprint timer runs about 1.5x fast (1 s shown in about 0.6-
 short. INFO page (pause, then Left) row TM: ms since Blockz opened by SysTick, ms by the music position (real time
 while one track plays), ratio x1000 (hex). Row CK: LOAD, the clock variable, SysTick CTRL. Read it after a minute
 or more with music already playing when Blockz opened, before the track changes.
+
+**Reading (build 33, 2026-11-11, music playing):** TM 0102B9 010278 03E7 = 66.233 s by SysTick vs 66.168 s by the
+music position, ratio 0.999; CK 1E847F 0BEBC200 07 = LOAD 1999999, clock variable 200 MHz, SysTick on. With music
+playing the game clock is right (and the timer counts frames at 60 per SysTick second, so it is right too).
+Remaining suspect: the CPU clock stock picks when nothing plays (a clock variable lower or higher than the real
+clock would make every tick short). Next: CK with nothing playing, and the timer against a watch in both states.
