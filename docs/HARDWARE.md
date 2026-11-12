@@ -180,7 +180,7 @@ out text wider than its current advances (clipping or scrolling).
   code.bin 0x5D410 (u32 per task): 0 m21, 1 m22, 2 m23, 3 m27, 4 m13, 5 m28, 6 m17, 7 m29, 8 m30, 9 m31, 10 m32,
   11 m9, 12 m6, 13 m5, 14..42 m81..m109 (task 19 = m86, the largest stock game, 13.8 KB: amuletOS Playlists).
 - **Slot-2 RAM (build 36):** 0x0309F800 amuletOS INQUIRY hook (56 B; D1 diagnostics 0x8C B until build 35),
-  0x0309F838.. helpers (np_helpers.c, np_stub.S, libscan.c; end 0x0309FF18), 0x0309FF28 playlist table (pl_table.h, 152 B), 0x0309FFC0 libscan FP, 0x0309FFD8 npui scroll,
+  0x0309F838.. helpers (np_helpers.c, np_stub.S, libscan.c; build 37: 1448 B, 328 B free below the table), 0x0309FF28 playlist table (pl_table.h, 152 B), 0x0309FFC0 libscan FP, 0x0309FFD8 npui scroll,
   0x0309FFE4 carousel index, 0x0309FFF0 stock reset magic.
 - **Slot 2 is resident:** module 1 loads slot 2 (type 7) at boot while reading the system config
   (0x030827B0), and no module runs above 0x0309F7CC, so code linked into slot 2 at 0x0309F800 stays loaded.

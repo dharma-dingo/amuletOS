@@ -89,6 +89,14 @@ def np_title_tag():
 
 SRC_DIR = None   # set by main: generated patches may read SRC_DIR/helpers.json (tools/build_helpers.py)
 
+def syms():
+    """slot-2 helpers (helpers.json) plus the screen module extensions (e21.json, e22.json; tools/extend_module.py)"""
+    h = {}
+    for f in ("helpers.json", "e21.json", "e22.json"):
+        p = os.path.join(SRC_DIR, f)
+        if os.path.exists(p): h.update(json.load(open(p)))
+    return h
+
 def np_v2():
     """Now Playing with the slot-2 helpers (game/device/np_helpers.c): artist wraps onto line 2,
     album moves to line 3 (genre gone), scrolling line shows the title with file-name fallback.
@@ -167,7 +175,7 @@ def menu_carousel():
     """v0.3 one-level main menu (module 21): items 0 Now Playing, 1 Music, 2 Blockz, 3 Library (art/menu_panels.py);
     Left/Right wrap over four, Up/Down do nothing, Start opens Settings (Setup page), position kept in RAM by the
     slot-2 stubs (np_stub.S). Use with menu_games_to_blockz (item 2 runs the old Games action, task 15)."""
-    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    h = syms()
     T = 0x030818B4                                   # tbb table of the tile action routine 0x0308188E
     tb = lambda a: (a - T) // 2
     np_handler = (thumb_bl(0x030819D0, h["menu_np"])                  # Now Playing if the player runs; return 1
@@ -193,7 +201,7 @@ def menu_carousel():
 def music_update():
     """Music menu (module 22) gets an eighth item, "Update", running stock's index-8 library update, forced past
     the fingerprint check (libscan.c lib_force). The 8-entry table lives in slot 2 (np_stub.S music_menu)."""
-    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    h = syms()
     t = struct.pack("<I", h["music_menu"]).hex()
     return [
         (22, 0x03081B28, "483b0203", t), (22, 0x03081F6C, "483b0203", t), (22, 0x03082174, "483b0203", t),
@@ -205,12 +213,14 @@ def music_update():
 def playlists():
     """v0.3 M3U playlists (build 35): Music menu row "Playlists" (9th entry, action 0x50 -> task 19 = module 86,
     game/device/playlists.c) and the song-change hook (0x0305E930 -> np_helpers.c pl_step). Apply after
-    music_update (row count 8 -> 9)."""
-    h = json.load(open(os.path.join(SRC_DIR, "helpers.json")))
+    music_update. The Music menu stays at 8 rows: Directory List was removed (build 37)."""
+    h = syms()
     return [
         (0, 0x0305E930, "2de9f84f", thumb_bw(0x0305E930, h["pl_step_hook"]).hex()),     # source step entry
         (22, 0x0308197E, "07b02846", thumb_bw(0x0308197E, h["pl_menu_exit"]).hex()),    # select routine exit
-        (22, 0x0308165A, "082604462e70", "092604462e70"),                               # 9 items
+        # still 8 items: Playlists added, Directory List removed (owner, build 37)
+        (22, 0x03081F54, "e2f7a4fa", thumb_bl(0x03081F54, h["m22_row_text"]).hex()),   # row text: icon + text
+        (22, 0x03082034, "e2f734fa", thumb_bl(0x03082034, h["m22_row_text"]).hex()),   # (selection change)
         # player thread init (build 36): while a playlist is active skip stock's Folders count / seek, which use the
         # browser's stale folder state (build 35: endless Loading)
         (33, 0x0308DF12, "b7f8f200632805d0", (thumb_bw(0x0308DF12, h["pl_init_count"]) + bytes.fromhex("00bf00bf")).hex()),

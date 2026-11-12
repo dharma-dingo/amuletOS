@@ -14,7 +14,7 @@ the module's .text and .data are written into the zero gap at code.bin --at (the
 are pointed at them. Link layout: game/device/module.ld (code at 0x030815C4, data at 0x03023B48
 starting with the window descriptor, ZI after). Then pack with build_reskin.py as usual.
 """
-import argparse, os, shutil, struct, subprocess, sys
+import argparse, json, os, shutil, struct, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ARM = r"C:\Users\Admin\tools\arm-gnu-toolchain\arm-gnu-toolchain-13.3.rel1-mingw-w64-i686-arm-none-eabi\bin"
@@ -91,6 +91,11 @@ def main():
     code[d_off:end] = data
     new = (BASE + t_off, CODE_EXEC, len(text), BASE + d_off, DATA_EXEC, len(data), bss_addr, bss_size)
     struct.pack_into("<8I", code, ent, *new)
+    dj = os.path.join(a.out, "donor.json")              # tools/extend_module.py's donor: launch -> this module
+    if os.path.exists(dj):
+        donor = json.load(open(dj))["donor"]
+        struct.pack_into("<8I", code, 8 + 32 * donor, *new)
+        print(f"  donor module {donor}'s entry -> module {a.module}")
     open(os.path.join(a.out, "code.bin"), "wb").write(code)
     print(f"module {a.module}: text {len(text)} B @ code.bin {t_off:#x}, data {len(data)} B @ {d_off:#x}, "
           f"ZI {bss_size} B @ {bss_addr:#x}")

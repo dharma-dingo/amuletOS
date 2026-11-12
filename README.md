@@ -142,7 +142,7 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
   ~3 s start, and Next / track end continue with the next file card-wide. Plan: at the Folders play request take
   the folder cluster + file slot from the browser directly, skip the card-wide walk (as for playlists, build 36),
   and step within the folder (Next / Prev / end by directory slot). Needs resident code for a folder walker:
-  slot 2 has 16 B left; find room (e.g. move libscan.c's build-time code out, or a resident area elsewhere).
+  build 37 freed 328 B of slot 2 by moving screen-only helpers into their modules (tools/extend_module.py).
 - **Resume from the Now Playing card (idea, 2026-11-11):** after a reboot, stock's Music-menu "Now playing" resumes the last song from the saved resume point (sys+0x64, HARDWARE.md main menu notes). The carousel card could do the same instead of staying grey; not built.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 
