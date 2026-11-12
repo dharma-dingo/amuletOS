@@ -315,6 +315,10 @@ out text wider than its current advances (clipping or scrolling).
   the CRC check at 0x0308214C *without* reading block 0 (0x0306D48E(0, buf, 0x800) at 0x03082140), so the CRC
   fails, the buffer is filled with 0xFF and every field takes its default: the language went back to Chinese and
   the library fingerprint was lost after each install. Patch `keep_settings`: the jump goes to 0x03082140.
+- Language = saved block +0x10 (0x03082306 `ldrb.w r0, [sp, #0x40]`), checked (<= 0x14) and mapped through the
+  enabled-language list into sys +0x10 (0 简体中文, 2 English). Patch `english` loads 2 instead (build 39). Settings
+  changes save at once (m32 0x03083F04, SaveSysConfig(1)). The first-boot language prompt shows from the main menu
+  while sys +0x2E5 != 0x55 (m21 0x030817D2).
 
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
