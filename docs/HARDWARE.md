@@ -251,6 +251,11 @@ out text wider than its current advances (clipping or scrolling).
   right after at 0x03023B74); count 7 at 0x0308165A, 7 rows per page; select 0x0308170C dispatches on the action:
   5 -> 6, 0..4 tbb, 6, 7 Favorites, 8 = library update (0x030818BE: stop player, sys+0x42 = 1, TaskSwitch(13, {1})),
   9, 0x64. Stock ships no entry for 8; text 90 "Update" unused.
+- Music menu row paint (m22 0x03081EB0, traced 2026-11-11): background image 159, rows at y = 0x3D + 23k (7 visible),
+  selection bar image 184 on the selected row ([0x03023B90 +2] = selected visible row, +1 = first item shown),
+  text from the table's text id at x = 15 (0x030644A0). **The table's icon ids are never drawn**: icons need a hook
+  (draw the icon, move the text right). Action 6 "Directory List" = TaskSwitch(9, {1}): the folder browser in
+  music mode (the main menu's Library card opens it in mode 3); its songs play as source 0x63 (slow Folders start).
 
 ## Now Playing keys (module 27, traced 2026-11-11)
 
