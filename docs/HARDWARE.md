@@ -308,6 +308,14 @@ out text wider than its current advances (clipping or scrolling).
   while it is the 1st live file (Windows' listing) and 4th by name; /_blockgame/Classic Theme.mp3 at slot 0 -> 1.
   The card's folders are full of deleted Syncthing sync-conflict entries, so slot != file count.
 
+## Settings across a firmware install (traced 2026-11-12, build 38)
+
+- Module 1's boot config load (0x03082090) reads a reserved flash area with 0x0305EE54(1, 2, buf); bytes +0x3FC..
+  +0x3FF == "FWUP" mark a just-installed update. That path (0x03082198) clears the marker (0x0305EE8E) and jumps to
+  the CRC check at 0x0308214C *without* reading block 0 (0x0306D48E(0, buf, 0x800) at 0x03082140), so the CRC
+  fails, the buffer is filled with 0xFF and every field takes its default: the language went back to Chinese and
+  the library fingerprint was lost after each install. Patch `keep_settings`: the jump goes to 0x03082140.
+
 ## Library update trigger and scan skip (traced 2026-11-07, build 27)
 
 - **sys +0x42 = "library needs update"**, set by: boot config load (m1 0x03082784 / 0x03082798: when the saved

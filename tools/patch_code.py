@@ -14,6 +14,11 @@ BASE = 0x03050000
 NOP2 = "00bf00bf"          # two Thumb NOPs, replaces one 4-byte BL
 
 PATCHES = {
+    # Settings survive a firmware install (build 38): after an update module 1's boot config load (0x03082090) saw
+    # the "FWUP" marker, cleared it and went to the CRC check without reading the saved block 0, so every setting
+    # (language, library fingerprint...) fell back to its default. Now the update path reads block 0 like a normal
+    # boot; a bad CRC still gives the defaults.
+    "keep_settings": [(1, 0x030821B4, "cae7", "c4e7")],          # b 0x0308214C -> b 0x03082140 (block read)
     # Stock Now Playing (module 27). Info box: line 1 artist (0x15e), line 2 album (0x25c),
     # line 3 genre (0x35a), each drawn by text 0x03063F76 with a fallback 0x030644A0 when empty.
     # Owner: show only artist and song title. Skip the album and genre draws (areas stay cleared).
