@@ -24,6 +24,11 @@ PATCHES = {
     # language only mixes scripts; and a reset (install before build 38, Settings reset) no longer leaves the owner
     # hunting through Chinese menus. ldrb.w r0, [sp, #0x40] -> movs r0, #2 (English); nop.
     "english": [(1, 0x03082306, "9df84000", "022000bf")],
+    # B in Now Playing goes to the main menu (build 40). Stock (m27 key handler): B press (0x40000040) ->
+    # 0x030838B0: clear 0x115, popup checks (messages 1, 0x50 / 0x51), then by source: Folders (0x63) / 6 -> folder
+    # browser, else the Music list. Owner: always the main menu. After the popup checks, jump to the Menu key's own
+    # path (0x0308389C: TaskSwitch(10, {1}) = main menu; the carousel keeps its own position).
+    "np_back_home": [(27, 0x030838E2, "2b4c", "dbe7")],   # ldr r4, =record -> b 0x0308389C
     # Stock Now Playing (module 27). Info box: line 1 artist (0x15e), line 2 album (0x25c),
     # line 3 genre (0x35a), each drawn by text 0x03063F76 with a fallback 0x030644A0 when empty.
     # Owner: show only artist and song title. Skip the album and genre draws (areas stay cleared).
