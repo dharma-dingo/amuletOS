@@ -1,4 +1,4 @@
-/* Game Boy probe (build 41; build 42: direct framebuffer drawing, no sprite sorting, clock shown): task 20
+/* Game Boy probe (build 41; 42: direct framebuffer drawing, no sprite sorting; 47: background push): task 20
  * (module 87's slot; the code sits in the file space of stock games 87..99,
  * tools/build_module.py --span). Opened by the Music menu's temporary "Games" row (m22_ext.S).
  *
@@ -93,7 +93,8 @@ static struct {
     uint8_t state, dirty, nlist, adc_state, adc_cand, gpio_idle, last_hdr, bstep;
     int sel, top;
     uint32_t adc_since, sel_since, next, stat_t0;
-    uint32_t frames, emu_us, draw_us, push_us, load_us, loads0, late, line_us;
+    uint32_t frames, emu_us, draw_us, push_us, load_us, loads0, late, line_us, wait_us;
+    uint8_t dma_busy;
     uint32_t last_ev, err;
     const rom_t *rom;
     uint32_t cb_read, cb_rw;          /* core B test results */
@@ -202,6 +203,42 @@ void gbx_line(const uint16_t *rgb, int line)
     S.line_us += now_us() - t0;
 }
 
+/* Background push (build 47). The panel driver's push (module 4, ops[5] = 0x03080FEC, called by stock's flush)
+ * sets the LCD window, sends command 6, starts a DMA from the framebuffer to the LCD FIFO 0x6007002C and then
+ * loops until the DMA's completion handler (0x03080EAC) sets *(u16 *)0x03023B44 = 1: build 46 measured 3.2 ms
+ * of waiting per frame. We do the same steps and return at once; the next push (or any stock flush) first waits
+ * for the flag. The DMA reads rows top to bottom at ~22 us a row, ahead of the next frame's line writes (~86 us
+ * a line), so it never shows a half-new frame. Full-width rows: the transfer is one contiguous block. */
+#define LCD_DONE   (*(volatile uint16_t *)0x03023B44u)
+#define LcdWindow(a, b, c, d)  STOCK_FN(0x03080F28, void, int, int, int, int)(a, b, c, d)
+#define VopCmd(a, b)           STOCK_FN(0x0306DE9C, void, uint32_t, uint32_t)(a, b)
+#define DmaGet()               STOCK_FN(0x030614F8, uint32_t, void)()
+#define DmaStart(ch, src, dst, n, cfg, cb)     STOCK_FN(0x03061524, void, uint32_t, uint32_t, uint32_t, uint32_t, void *, uint32_t)(ch, src, dst, n, cfg, cb)
+
+static void push_wait(void)
+{
+    if (!S.dma_busy) return;
+    uint32_t t0 = now_us();
+    while (LCD_DONE != 1) { if (now_us() - t0 > 50000) break; }   /* never hang: 50 ms cap */
+    S.wait_us += now_us() - t0;
+    S.dma_busy = 0;
+}
+
+static void push_async(void)
+{
+    static uint32_t cfg[4];
+    push_wait();
+    const volatile uint32_t *c = (const volatile uint32_t *)0x0306E96Cu;   /* the driver's DMA settings */
+    for (int i = 0; i < 4; i++) cfg[i] = c[i];
+    uint32_t src = 0x03006688u + FB_PAGE * 0x1B760u + GB_Y * 592u;
+    LCD_DONE = 0;
+    LcdWindow(0, GB_Y, 0x127, GB_Y + LCD_HEIGHT - 1);
+    VopCmd(0, 6);
+    uint32_t ch = DmaGet() & 0xFF;
+    DmaStart(ch, src, 0x6007002Cu, 0x128u * LCD_HEIGHT / 2, cfg, 0x03080EADu);
+    S.dma_busy = 1;
+}
+
 static void mark_dirty(void)
 {
     Window(GB_X, GB_Y, GB_X + LCD_WIDTH - 1, GB_Y + LCD_HEIGHT - 1);
@@ -258,9 +295,11 @@ static void deinit(void) { GameLeaveA(); GameLeaveB(); }
 
 static int32_t tick(void) { return 0; }
 
+static void push_wait(void);
 static void quit(void)
 {
     uint16_t tile = 1;
+    push_wait();
     GameLeaveB();
     TaskSwitch(0, &tile);
     S.state = ST_QUIT;
@@ -339,15 +378,15 @@ static void stats(uint32_t now)
     fill(0, 0, 295, GB_Y - 3, C_SCREEN);
     fill(0, GB_Y + LCD_HEIGHT + 2, 295, 239, C_SCREEN);
     say(4, 4, C_INK, "%s  FPS %1", (uint32_t)title, span ? S.frames * 10000000u / span : 0, 0, 0, 0);
-    say(4, 24, C_INK, "EMU %1 DRAW %1 PUSH %1 MHZ %d", S.emu_us / f / 100, S.draw_us / f / 100, S.push_us / f / 100,
-        (ST_LOAD + 1u) / 10000u, 0);
+    say(4, 24, C_INK, "EMU %1 DRAW %1 PUSH %1 WAIT %1", S.emu_us / f / 100, S.draw_us / f / 100,
+        S.push_us / f / 100, S.wait_us / f / 100, 0);
     say(4, 198, C_INK, "PAGES %d LOADS %d %1MS OP %x", B->g.nslots, B->g.misses - S.loads0, S.load_us / 100,
         *(volatile uint32_t *)(0x0306FD14u + 0x14), 0);       /* panel driver push routine (flush ops[5]) */
     uint8_t pad = (uint8_t)~B->g.gb.direct.joypad;
     say(4, 218, C_DIM, "ADC %d G%d KEYS %x CLK %d", ADC_CH1, gpio_key(), pad,
         *(volatile uint32_t *)0x030065D8u / 1000000u, 0);
     S.stat_t0 = now_us();
-    S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = 0;
+    S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = S.wait_us = 0;
     S.loads0 = B->g.misses;
 }
 
@@ -366,8 +405,7 @@ static void run(void)
     uint32_t t0 = now_us();
     gb_run_frame(&B->g.gb);
     uint32_t t1 = now_us();
-    mark_dirty();
-    Flush();
+    push_async();
     uint32_t t2 = now_us();
     S.emu_us += (t1 - t0) - S.line_us;
     S.draw_us += S.line_us;
@@ -376,7 +414,7 @@ static void run(void)
     if (B->g.err) { S.err = 200 + (uint32_t)B->g.err; S.state = ST_ERR; redraw(); return; }
     S.next += FRAME_US;
     if ((int32_t)(t2 - S.next) > (int32_t)(3 * FRAME_US)) { S.next = t2; S.late++; }
-    if (t2 - S.stat_t0 >= 1000000) { stats(t2); Flush(); }
+    if (t2 - S.stat_t0 >= 1000000) { push_wait(); stats(t2); Flush(); }
 }
 
 static void core_b_test(void)

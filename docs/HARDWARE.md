@@ -453,3 +453,9 @@ out text wider than its current advances (clipping or scrolling).
 - **0x03090800.. is not executable** (build 45 Benchmark, 2026-11-13: a 3-instruction loop copied to 0x03090900 and
   called with interrupts off hung the device at that step; build 44 ran the same and came back with the probe's
   state scrambled). Data only: fine for emulator state and the page cache; code stays in the overlay window.
+- **Screen push (traced 2026-11-13, build 47):** stock flush 0x0306558A -> panel ops (table 0x0306FD14, from module 4
+  = resident panel driver at 0x03080E9C) ops[5] = 0x03080FEC(x0, y0, x1, y1, src): window 0x03080F28, 0x0306DE9C(0, 6),
+  DMA channel 0x030614F8, DMA 0x03061524(ch, src, 0x6007002C, w*h/2, settings copied from 0x0306E96C, completion
+  0x03080EAD) and a wait loop (0x03056704) until u16 0x03023B44 == 1 (set by the completion). Full-width rows only
+  (one contiguous block). Rows >= 190 take a second pass after a ~1 ms busy wait (0x03065B58(1) = clk / 3000 loops).
+  Full width x 144 rows took 3.2 ms (~22 us a row).
