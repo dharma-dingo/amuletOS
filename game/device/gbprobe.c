@@ -89,7 +89,7 @@ typedef struct {                     /* everything big, at U_BASE */
 #define B ((big_t *)U_BASE)
 
 static struct {
-    uint8_t state, dirty, nlist, adc_state, adc_cand, gpio_idle, last_hdr;
+    uint8_t state, dirty, nlist, adc_state, adc_cand, gpio_idle, last_hdr, bstep;
     int sel, top;
     uint32_t adc_since, sel_since, next, stat_t0;
     uint32_t frames, emu_us, draw_us, push_us, load_us, loads0, late, line_us;
@@ -429,32 +429,50 @@ static uint32_t cyc_read(const volatile uint32_t *p, uint32_t words)
     return c * 10u / (8 * words);
 }
 
-static void bench(void)
+/* Build 45: one step per service call, results drawn as they come (owner on 44: "Error 17998584" right after
+ * Benchmark: something in the run scrambled the probe's state). The riskiest step, running code copied onto the
+ * stack, goes last; the screen shows how far it got. */
+#define BENCH_STEPS 8
+static void bench_step(void)
 {
-    DEMCR |= 1u << 24;
-    DWT_CTL |= 1u;
-    uint32_t a = CYCCNT; for (volatile int i = 0; i < 10; i++) {} S.bench[9] = CYCCNT != a;   /* DWT (0 on 43) */
-    /* the loop body copied elsewhere: subs r0, #1; bne -4; bx lr */
-    static const uint16_t body[4] = { 0x3801, 0xD1FD, 0x4770, 0xBF00 };
-    uint16_t *u = (uint16_t *)(U_BASE + 0x100);
-    uint16_t stack[8] __attribute__((aligned(4)));
-    for (int i = 0; i < 4; i++) { u[i] = body[i]; stack[i] = body[i]; }
-    __asm volatile("dsb;  isb" ::: "memory");
-    S.bench[8] = ThreadRunning(*(volatile uint32_t *)0x030232BCu, 0x030361A4) == 1;
-    __asm volatile("cpsid i" ::: "memory");
-    S.bench[0] = cyc_spin(spin, 50000);
-    S.bench[1] = cyc_spin((void (*)(uint32_t))((uint32_t)u | 1), 50000);
-    S.bench[2] = cyc_spin((void (*)(uint32_t))((uint32_t)stack | 1), 50000);
-    S.bench[3] = cyc_read((const volatile uint32_t *)(U_BASE + 0x1000), 2048);
-    S.bench[4] = cyc_read((const volatile uint32_t *)0x03023B48u, 256);
-    S.bench[5] = cyc_read((const volatile uint32_t *)0x03006688u, 2048);
-    S.bench[6] = cyc_read((const volatile uint32_t *)(((uint32_t)_text_end + 3) & ~3u), 2048);
-    __asm volatile("cpsie i" ::: "memory");
-    {   /* interrupts on: 2M iterations (~30 ms) timed with the tick counter, in cycles of 200 MHz */
+    static const uint16_t body[4] = { 0x3801, 0xD1FD, 0x4770, 0xBF00 };   /* subs r0, #1; bne -4; bx lr; nop */
+    uint32_t *b = S.bench, k = S.bstep;
+    if (k == 0) b[8] = ThreadRunning(*(volatile uint32_t *)0x030232BCu, 0x030361A4) == 1;
+    if (k == 5) {                                                   /* interrupts on, timed with the tick counter */
         uint32_t t0 = now_us();
         spin(2000000);
-        S.bench[7] = (now_us() - t0) * 200u * 10u / 2000000u;
+        b[7] = (now_us() - t0) * 200u * 10u / 2000000u;
+    } else if (k == 6) {                                            /* loop copied into the probe region */
+        uint16_t *u = (uint16_t *)(U_BASE + 0x100);
+        for (int i = 0; i < 4; i++) u[i] = body[i];
+        __asm volatile("dsb; isb" ::: "memory");
+        __asm volatile("cpsid i" ::: "memory");
+        b[1] = cyc_spin((void (*)(uint32_t))((uint32_t)u | 1), 50000);
+        __asm volatile("cpsie i" ::: "memory");
+    } else if (k == 7) {                                            /* loop copied onto the stack */
+        uint16_t st[8] __attribute__((aligned(4)));
+        for (int i = 0; i < 4; i++) st[i] = body[i];
+        __asm volatile("dsb; isb" ::: "memory");
+        __asm volatile("cpsid i" ::: "memory");
+        b[2] = cyc_spin((void (*)(uint32_t))((uint32_t)st | 1), 50000);
+        __asm volatile("cpsie i" ::: "memory");
+    } else {
+        __asm volatile("cpsid i" ::: "memory");
+        if (k == 0) b[0] = cyc_spin(spin, 50000);
+        if (k == 1) b[3] = cyc_read((const volatile uint32_t *)(U_BASE + 0x1000), 2048);
+        if (k == 2) b[4] = cyc_read((const volatile uint32_t *)0x03023B48u, 256);
+        if (k == 3) b[5] = cyc_read((const volatile uint32_t *)0x03006688u, 2048);
+        if (k == 4) b[6] = cyc_read((const volatile uint32_t *)(((uint32_t)_text_end + 3) & ~3u), 2048);
+        __asm volatile("cpsie i" ::: "memory");
     }
+    S.bstep = (uint8_t)(k + 1);
+    redraw();
+}
+
+static void bench(void)
+{
+    for (int i = 0; i < 10; i++) S.bench[i] = 0;
+    S.bstep = 0;
     S.state = ST_BENCH;
     redraw();
 }
@@ -462,6 +480,7 @@ static void bench(void)
 static int32_t service(void)
 {
     if (S.state == ST_QUIT) return -1;
+    if (S.state == ST_BENCH && S.bstep < BENCH_STEPS && !S.dirty) bench_step();
     if (S.state == ST_RUN) {
         for (int n = 0; n < 8; n++) { uint32_t ev = GetKey(); if (!ev) break; S.last_ev = ev; }
         run();
@@ -473,6 +492,7 @@ static int32_t service(void)
         uint32_t type = ev >> 24, k = ev & 0x1FF;
         if (type != EV_PRESS && type != 0x30) continue;
         if (k == K_B || (k == K_LEFT && type == EV_PRESS)) { quit(); return -1; }
+        if (S.state == ST_BENCH && S.bstep < BENCH_STEPS) continue;
         if (S.state == ST_ERR || S.state == ST_CORE_B || S.state == ST_BENCH) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
         if (S.state != ST_LIST) continue;
         int count = S.nlist + 2;                                   /* + "Test core B memory", "Benchmark" */
@@ -517,7 +537,7 @@ static void paint(void)
     if (S.state == ST_ERR) {
         if (S.err == 100) say(12, 64, C_INK, "Game Boy Color only", 0, 0, 0, 0, 0);
         else if (S.err == 101) say(12, 64, C_INK, "Over 2 MB", 0, 0, 0, 0, 0);
-        else say(12, 64, C_INK, "Error %d", S.err, 0, 0, 0, 0);
+        else say(12, 64, C_INK, "Error %d  step %d", S.err, S.bstep, 0, 0, 0);
         COLOR = old; return;
     }
     if (S.state == ST_CORE_B) {
@@ -527,11 +547,11 @@ static void paint(void)
     }
     if (S.state == ST_BENCH) {
         const uint32_t *b = S.bench;
-        say(12, 64, C_INK, "Loop: code %1  region %1  stack %1", b[0], b[1], b[2], 0, 0);
-        say(12, 87, C_INK, "Read: region %1  data %1", b[3], b[4], 0, 0, 0);
-        say(12, 110, C_INK, "Read: screen %1  window %1", b[5], b[6], 0, 0, 0);
-        say(12, 133, C_INK, "Loop, interrupts on %1", b[7], 0, 0, 0, 0);
-        say(12, 156, C_INK, "Music %d  DWT %d  (cycles)", b[8], b[9], 0, 0, 0);
+        say(12, 64, C_INK, "Loop %1  read: region %1  data %1", b[0], b[3], b[4], 0, 0);
+        say(12, 87, C_INK, "Read: screen %1  window %1", b[5], b[6], 0, 0, 0);
+        say(12, 110, C_INK, "Loop, interrupts on %1", b[7], 0, 0, 0, 0);
+        say(12, 133, C_INK, "Loop: region %1  stack %1", b[1], b[2], 0, 0, 0);
+        say(12, 156, C_INK, "Music %d  step %d of 8  (cycles)", b[8], S.bstep, 0, 0, 0);
         COLOR = old; return;
     }
     int count = msg ? 0 : S.nlist + 2;
