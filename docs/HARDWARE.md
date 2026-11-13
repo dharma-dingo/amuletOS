@@ -450,3 +450,6 @@ out text wider than its current advances (clipping or scrolling).
   The Frog for Whom the Bell Tolls.
 - **No DWT cycle counter** (build 43: CYCCNT stays 0 after DEMCR.TRCENA + DWT_CTRL.CYCCNTENA). Time short spans
   with SysTick VAL (counts down at the core clock from LOAD; (start - end) mod LOAD + 1, under one 10 ms tick).
+- **0x03090800.. is not executable** (build 45 Benchmark, 2026-11-13: a 3-instruction loop copied to 0x03090900 and
+  called with interrupts off hung the device at that step; build 44 ran the same and came back with the probe's
+  state scrambled). Data only: fine for emulator state and the page cache; code stays in the overlay window.
