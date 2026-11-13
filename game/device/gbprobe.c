@@ -8,7 +8,8 @@
  *   line 2: milliseconds per frame spent emulating, drawing (stock Window + Pixel) and pushing (stock flush)
  *   bottom: page cache (pages, loads per second, ms spent loading), cartridge RAM size
  *   line 4: raw button ADC, GPIO key level, the held Game Boy buttons, the last GetKey event
- * Last list row "Test core B memory": reads the second core's RAM from this core (may crash: that is the answer).
+ * List row "Test core B memory": reads the second core's RAM from this core (may crash: that is the answer).
+ * Last row "Benchmark" (build 43): cycles per loop iteration and per read in each memory area (see bench()).
  * Hold Select for 1.5 s to quit. No sound, no saves.
  *
  * Memory (docs/HARDWARE.md "Game Boy probe"): the emulator state, the list and part of the page cache use
@@ -71,7 +72,7 @@ extern char _text_end[];             /* module.ld: end of this module's code */
 #define ROWS     7
 #define NLIST    24
 
-enum { ST_LIST, ST_NOCARD, ST_NODIR, ST_EMPTY, ST_RUN, ST_ERR, ST_CORE_B, ST_QUIT };
+enum { ST_LIST, ST_NOCARD, ST_NODIR, ST_EMPTY, ST_RUN, ST_ERR, ST_CORE_B, ST_BENCH, ST_QUIT };
 
 typedef struct {
     uint32_t first, len;
@@ -95,6 +96,7 @@ static struct {
     uint32_t last_ev, err;
     const rom_t *rom;
     uint32_t cb_read, cb_rw;          /* core B test results */
+    uint32_t bench[10];               /* Benchmark row: cycles x 10 */
 } S;
 
 /* ---- text (stock 16 px font, drawn as runs; as playlists.c) ---- */
@@ -388,6 +390,66 @@ static void core_b_test(void)
     redraw();
 }
 
+
+/* ---- Benchmark row (build 43): owner on 42: EMU 13.3 ms a frame at 200 MHz, ~150x the PC (expected 20-40x).
+ * Cycle counts from the core's DWT cycle counter, interrupts off, so they show memory and fetch speed alone:
+ *   [0] loop in our code (overlay window), per iteration ("subs; bne": 2-3 cycles with no wait states)
+ *   [1] the same loop copied to the probe region (0x03090800..), [2] copied to the stack
+ *   [3..6] cycles per 32-bit read: probe region, data window 0x03023B48, framebuffer 0x03006688, overlay window
+ *   [7] the code-window loop with interrupts on (other threads / interrupts included), [8] music playing (1/0)
+ *   [9] cycle counter running (1/0) */
+#define DEMCR   (*(volatile uint32_t *)0xE000EDFCu)
+#define DWT_CTL (*(volatile uint32_t *)0xE0001000u)
+#define CYCCNT  (*(volatile uint32_t *)0xE0001004u)
+
+__attribute__((noinline, aligned(4))) static void spin(uint32_t n)
+{
+    __asm volatile("1: subs %0, %0, #1;  bne 1b" : "+r"(n));
+}
+
+static uint32_t cyc_spin(void (*f)(uint32_t), uint32_t n)
+{
+    uint32_t c0 = CYCCNT;
+    f(n);
+    return (CYCCNT - c0) * 10u / n;
+}
+
+static uint32_t cyc_read(const volatile uint32_t *p, uint32_t words)
+{
+    uint32_t sum = 0, c0 = CYCCNT;
+    for (uint32_t r = 0; r < 8; r++)
+        for (uint32_t i = 0; i < words; i += 4) sum += p[i] + p[i + 1] + p[i + 2] + p[i + 3];
+    uint32_t c = CYCCNT - c0;
+    __asm volatile("" :: "r"(sum));
+    return c * 10u / (8 * words);
+}
+
+static void bench(void)
+{
+    DEMCR |= 1u << 24;
+    DWT_CTL |= 1u;
+    uint32_t a = CYCCNT; for (volatile int i = 0; i < 10; i++) {} S.bench[9] = CYCCNT != a;
+    /* the loop body copied elsewhere: subs r0, #1; bne -4; bx lr */
+    static const uint16_t body[4] = { 0x3801, 0xD1FD, 0x4770, 0xBF00 };
+    uint16_t *u = (uint16_t *)(U_BASE + 0x100);
+    uint16_t stack[8] __attribute__((aligned(4)));
+    for (int i = 0; i < 4; i++) { u[i] = body[i]; stack[i] = body[i]; }
+    __asm volatile("dsb;  isb" ::: "memory");
+    S.bench[8] = ThreadRunning(*(volatile uint32_t *)0x030232BCu, 0x030361A4) == 1;
+    __asm volatile("cpsid i" ::: "memory");
+    S.bench[0] = cyc_spin(spin, 100000);
+    S.bench[1] = cyc_spin((void (*)(uint32_t))((uint32_t)u | 1), 100000);
+    S.bench[2] = cyc_spin((void (*)(uint32_t))((uint32_t)stack | 1), 100000);
+    S.bench[3] = cyc_read((const volatile uint32_t *)(U_BASE + 0x1000), 4096);
+    S.bench[4] = cyc_read((const volatile uint32_t *)0x03023B48u, 256);
+    S.bench[5] = cyc_read((const volatile uint32_t *)0x03006688u, 4096);
+    S.bench[6] = cyc_read((const volatile uint32_t *)(((uint32_t)_text_end + 3) & ~3u), 2048);
+    __asm volatile("cpsie i" ::: "memory");
+    S.bench[7] = cyc_spin(spin, 2000000);
+    S.state = ST_BENCH;
+    redraw();
+}
+
 static int32_t service(void)
 {
     if (S.state == ST_QUIT) return -1;
@@ -402,9 +464,9 @@ static int32_t service(void)
         uint32_t type = ev >> 24, k = ev & 0x1FF;
         if (type != EV_PRESS && type != 0x30) continue;
         if (k == K_B || (k == K_LEFT && type == EV_PRESS)) { quit(); return -1; }
-        if (S.state == ST_ERR || S.state == ST_CORE_B) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
+        if (S.state == ST_ERR || S.state == ST_CORE_B || S.state == ST_BENCH) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
         if (S.state != ST_LIST) continue;
-        int count = S.nlist + 1;                                   /* + "Test core B memory" */
+        int count = S.nlist + 2;                                   /* + "Test core B memory", "Benchmark" */
         if (k == K_UP || k == K_DOWN) {
             int s = S.sel + (k == K_DOWN ? 1 : -1);
             if (s < 0) s = count - 1;
@@ -415,6 +477,7 @@ static int32_t service(void)
             redraw();
         } else if (k == K_A && type == EV_PRESS) {
             if (S.sel == S.nlist) core_b_test();
+            else if (S.sel == S.nlist + 1) bench();
             else start(&B->list[S.sel]);
             if (S.state == ST_RUN) return 0;
         }
@@ -453,7 +516,16 @@ static void paint(void)
         say(12, 87, C_INK, S.cb_rw == 1 ? "0102E000 write ok" : "0102E000 write lost", 0, 0, 0, 0, 0);
         COLOR = old; return;
     }
-    int count = msg ? 0 : S.nlist + 1;
+    if (S.state == ST_BENCH) {
+        const uint32_t *b = S.bench;
+        say(12, 64, C_INK, "Loop: code %1  region %1  stack %1", b[0], b[1], b[2], 0, 0);
+        say(12, 87, C_INK, "Read: region %1  data %1", b[3], b[4], 0, 0, 0);
+        say(12, 110, C_INK, "Read: screen %1  window %1", b[5], b[6], 0, 0, 0);
+        say(12, 133, C_INK, "Loop, interrupts on %1", b[7], 0, 0, 0, 0);
+        say(12, 156, C_INK, "Music %d  counter %d  (cycles)", b[8], b[9], 0, 0, 0);
+        COLOR = old; return;
+    }
+    int count = msg ? 0 : S.nlist + 2;
     for (int r = 0; r < ROWS; r++) {
         int i = S.top + r, y = 61 + r * 23, on = i == S.sel && i < count;
         fill(0, y, 295, y + 21, on ? C_TINT : C_WHITE);
@@ -462,6 +534,7 @@ static void paint(void)
         if (msg) { if (r == 0) say(12, y + 3, C_DIM, msg, 0, 0, 0, 0, 0); continue; }
         if (i >= count) continue;
         if (i == S.nlist) { say(12, y + 3, C_INK, "Test core B memory", 0, 0, 0, 0, 0); continue; }
+        if (i == S.nlist + 1) { say(12, y + 3, C_INK, "Benchmark", 0, 0, 0, 0, 0); continue; }
         const rom_t *rm = &B->list[i];
         uint16_t b[EX_NAME + 1];
         for (int c = 0; c < rm->nlen; c++) b[c] = rm->name[c];

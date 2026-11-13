@@ -144,6 +144,16 @@ Ship a **patcher, never a firmware image**: the user downloads official V1.7.8 f
   and step within the folder (Next / Prev / end by directory slot). Needs resident code for a folder walker:
   build 37 freed 328 B of slot 2 by moving screen-only helpers into their modules (tools/extend_module.py).
 - **Resume from the Now Playing card (idea, 2026-11-11):** after a reboot, stock's Music-menu "Now playing" resumes the last song from the saved resume point (sys+0x64, HARDWARE.md main menu notes). The carousel card could do the same instead of staying grey; not built.
+- **Game Boy: DMG LCD look (owner, 2026-11-13, add-on to Game Boy support; "being very performance minded"):** like the
+  RetroArch "improved Game Boy DMG shaders" (r/RetroArch post 1uj5vdl; owner's example: Nintendo - Game Boy.glslp):
+  green-olive DMG palette, a visible pixel grid (darker gaps between pixels), slight LCD ghosting, olive border.
+  On the AP30 there is no GPU: every effect is CPU work per pixel per frame, inside the 16.7 ms budget. Cheap to
+  free: the palette (a 4-entry lookup we already do), the border (drawn once). Cheap: ghosting = average with the
+  previous frame's pixel (one masked add per RGB565 pixel, needs a 46 KB previous-frame buffer we do not have
+  room for yet; or blend only on change). The grid needs more than 1 screen pixel per Game Boy pixel: 1x
+  (160x144) has no room for gaps, 2x does not fit 296x240; a 1.5x scale (240x216) gives every second pixel a
+  gap line (uneven), so the grid look is the costly / uneven part. Precomputed per-shade tiles (scale + grid +
+  colour baked into a lookup) keep it to table copies. Decide after the probe shows how much frame time is left.
 - **Favourites (owner idea, 2026-11-07, future):** while browsing music, favourite a song, album or artist with one press; a Favorites section is added to the main carousel. A lean playlist implementation (no playlist editor needed).
 
 - **Blockz controls (face buttons can't combine, measured by D1; now part of the v0.2 Blockz).** Stock has the same limit. Options discussed 2026-11-07: (1) rotate on the volume wheel; (2) hybrid, wheel rotates plus A/B rotate when no direction is held (preferred); (3) face buttons only with DAS kept through brief direction release (avoid); (4) the GPIO2 pin 5 key as an extra rotate. Owner: Up = fast (hard) drop; details to settle during the build. Also: adjustable DAS/ARR, wheel = piece control in game with volume in the pause menu, ADC thresholds at midpoints of measured values. Open: wheel position/ergonomics, and which physical button the GPIO key is.
