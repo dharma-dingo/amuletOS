@@ -67,7 +67,8 @@ extern char _text_end[];             /* module.ld: end of this module's code */
 #define C_GRAPE  RGB565(0x73, 0x53, 0xe0)
 
 #define GB_X     68                  /* (296 - 160) / 2 */
-#define GB_Y     48                  /* (240 - 144) / 2 */
+#define GB_Y     44                  /* build 46: rows 44..187, above row 190 where stock's flush starts a second,
+                                       delayed push (0x03065B58(1) busy-waits ~1 ms first); was 48 */
 #define FRAME_US 16743u              /* 70224 cycles at 4.194304 MHz */
 #define ROWS     7
 #define NLIST    24
@@ -340,8 +341,8 @@ static void stats(uint32_t now)
     say(4, 4, C_INK, "%s  FPS %1", (uint32_t)title, span ? S.frames * 10000000u / span : 0, 0, 0, 0);
     say(4, 24, C_INK, "EMU %1 DRAW %1 PUSH %1 MHZ %d", S.emu_us / f / 100, S.draw_us / f / 100, S.push_us / f / 100,
         (ST_LOAD + 1u) / 10000u, 0);
-    say(4, 198, C_INK, "PAGES %d LOADS %d %1MS SAVE %d", B->g.nslots, B->g.misses - S.loads0, S.load_us / 100,
-        B->g.cram_len, 0);
+    say(4, 198, C_INK, "PAGES %d LOADS %d %1MS OP %x", B->g.nslots, B->g.misses - S.loads0, S.load_us / 100,
+        *(volatile uint32_t *)(0x0306FD14u + 0x14), 0);       /* panel driver push routine (flush ops[5]) */
     uint8_t pad = (uint8_t)~B->g.gb.direct.joypad;
     say(4, 218, C_DIM, "ADC %d G%d KEYS %x CLK %d", ADC_CH1, gpio_key(), pad,
         *(volatile uint32_t *)0x030065D8u / 1000000u, 0);
