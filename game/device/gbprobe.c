@@ -392,7 +392,8 @@ static void core_b_test(void)
 
 
 /* ---- Benchmark row (build 43): owner on 42: EMU 13.3 ms a frame at 200 MHz, ~150x the PC (expected 20-40x).
- * Cycle counts from the core's DWT cycle counter, interrupts off, so they show memory and fetch speed alone:
+ * Cycle counts from SysTick (build 44; the DWT counter does not run here), interrupts off, so they show memory and
+ * fetch speed alone:
  *   [0] loop in our code (overlay window), per iteration ("subs; bne": 2-3 cycles with no wait states)
  *   [1] the same loop copied to the probe region (0x03090800..), [2] copied to the stack
  *   [3..6] cycles per 32-bit read: probe region, data window 0x03023B48, framebuffer 0x03006688, overlay window
@@ -401,6 +402,10 @@ static void core_b_test(void)
 #define DEMCR   (*(volatile uint32_t *)0xE000EDFCu)
 #define DWT_CTL (*(volatile uint32_t *)0xE0001000u)
 #define CYCCNT  (*(volatile uint32_t *)0xE0001004u)
+/* Build 44: the DWT cycle counter does not count on this chip (owner: all values 0 on 43). SysTick counts down at
+ * the core clock from LOAD (2,000,000 per 10 ms tick at 200 MHz) and keeps counting with interrupts off, so any
+ * span under one tick is (start - end) modulo LOAD + 1. Each measurement below stays well under 10 ms. */
+static uint32_t st_span(uint32_t v0, uint32_t v1) { return v0 >= v1 ? v0 - v1 : v0 + ST_LOAD + 1u - v1; }
 
 __attribute__((noinline, aligned(4))) static void spin(uint32_t n)
 {
@@ -409,17 +414,17 @@ __attribute__((noinline, aligned(4))) static void spin(uint32_t n)
 
 static uint32_t cyc_spin(void (*f)(uint32_t), uint32_t n)
 {
-    uint32_t c0 = CYCCNT;
+    uint32_t c0 = ST_VAL;
     f(n);
-    return (CYCCNT - c0) * 10u / n;
+    return st_span(c0, ST_VAL) * 10u / n;
 }
 
 static uint32_t cyc_read(const volatile uint32_t *p, uint32_t words)
 {
-    uint32_t sum = 0, c0 = CYCCNT;
+    uint32_t sum = 0, c0 = ST_VAL;
     for (uint32_t r = 0; r < 8; r++)
         for (uint32_t i = 0; i < words; i += 4) sum += p[i] + p[i + 1] + p[i + 2] + p[i + 3];
-    uint32_t c = CYCCNT - c0;
+    uint32_t c = st_span(c0, ST_VAL);
     __asm volatile("" :: "r"(sum));
     return c * 10u / (8 * words);
 }
@@ -428,7 +433,7 @@ static void bench(void)
 {
     DEMCR |= 1u << 24;
     DWT_CTL |= 1u;
-    uint32_t a = CYCCNT; for (volatile int i = 0; i < 10; i++) {} S.bench[9] = CYCCNT != a;
+    uint32_t a = CYCCNT; for (volatile int i = 0; i < 10; i++) {} S.bench[9] = CYCCNT != a;   /* DWT (0 on 43) */
     /* the loop body copied elsewhere: subs r0, #1; bne -4; bx lr */
     static const uint16_t body[4] = { 0x3801, 0xD1FD, 0x4770, 0xBF00 };
     uint16_t *u = (uint16_t *)(U_BASE + 0x100);
@@ -437,15 +442,19 @@ static void bench(void)
     __asm volatile("dsb;  isb" ::: "memory");
     S.bench[8] = ThreadRunning(*(volatile uint32_t *)0x030232BCu, 0x030361A4) == 1;
     __asm volatile("cpsid i" ::: "memory");
-    S.bench[0] = cyc_spin(spin, 100000);
-    S.bench[1] = cyc_spin((void (*)(uint32_t))((uint32_t)u | 1), 100000);
-    S.bench[2] = cyc_spin((void (*)(uint32_t))((uint32_t)stack | 1), 100000);
-    S.bench[3] = cyc_read((const volatile uint32_t *)(U_BASE + 0x1000), 4096);
+    S.bench[0] = cyc_spin(spin, 50000);
+    S.bench[1] = cyc_spin((void (*)(uint32_t))((uint32_t)u | 1), 50000);
+    S.bench[2] = cyc_spin((void (*)(uint32_t))((uint32_t)stack | 1), 50000);
+    S.bench[3] = cyc_read((const volatile uint32_t *)(U_BASE + 0x1000), 2048);
     S.bench[4] = cyc_read((const volatile uint32_t *)0x03023B48u, 256);
-    S.bench[5] = cyc_read((const volatile uint32_t *)0x03006688u, 4096);
+    S.bench[5] = cyc_read((const volatile uint32_t *)0x03006688u, 2048);
     S.bench[6] = cyc_read((const volatile uint32_t *)(((uint32_t)_text_end + 3) & ~3u), 2048);
     __asm volatile("cpsie i" ::: "memory");
-    S.bench[7] = cyc_spin(spin, 2000000);
+    {   /* interrupts on: 2M iterations (~30 ms) timed with the tick counter, in cycles of 200 MHz */
+        uint32_t t0 = now_us();
+        spin(2000000);
+        S.bench[7] = (now_us() - t0) * 200u * 10u / 2000000u;
+    }
     S.state = ST_BENCH;
     redraw();
 }
@@ -522,7 +531,7 @@ static void paint(void)
         say(12, 87, C_INK, "Read: region %1  data %1", b[3], b[4], 0, 0, 0);
         say(12, 110, C_INK, "Read: screen %1  window %1", b[5], b[6], 0, 0, 0);
         say(12, 133, C_INK, "Loop, interrupts on %1", b[7], 0, 0, 0, 0);
-        say(12, 156, C_INK, "Music %d  counter %d  (cycles)", b[8], b[9], 0, 0, 0);
+        say(12, 156, C_INK, "Music %d  DWT %d  (cycles)", b[8], b[9], 0, 0, 0);
         COLOR = old; return;
     }
     int count = msg ? 0 : S.nlist + 2;

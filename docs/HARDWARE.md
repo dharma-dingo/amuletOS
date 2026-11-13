@@ -448,3 +448,5 @@ out text wider than its current advances (clipping or scrolling).
   Friendly Little Island Deluxe are colourised hacks with header 0x143 = 0xC0 (Game Boy Color only); original
   Game Boy games there: Super Mario Land, Catrap, Pipe Dream, QIX, Burger Time Deluxe, Picross 2, Embers of Mana,
   The Frog for Whom the Bell Tolls.
+- **No DWT cycle counter** (build 43: CYCCNT stays 0 after DEMCR.TRCENA + DWT_CTRL.CYCCNTENA). Time short spans
+  with SysTick VAL (counts down at the core clock from LOAD; (start - end) mod LOAD + 1, under one 10 ms tick).
