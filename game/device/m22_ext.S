@@ -18,18 +18,23 @@ music_menu:
     .hword 0xEA, 0x59, 7      @ Favorites (heart, build 34; stock used the folder)
     .hword 0xEC, 0x56, 0x50   @ Playlists (text 86; action 0x50 -> pl_menu_exit, build 35)
     .hword 0xEB, 0x5A, 8      @ Update (refresh arrows, build 34)
+    .hword 0xE8, 0x09, 0x51   @ Games (text 9; action 0x51 -> Game Boy probe, task 20; build 41, temporary)
 
 @ Music menu select routine's exit (module 22 0x0308197E, was "add sp, #0x1c; mov r0, r5"): action 0x50 (the
-@ Playlists row) opens the Playlists screen, task 19 (module 86, game/device/playlists.c).
+@ Playlists row) opens the Playlists screen, task 19 (module 86, game/device/playlists.c); action 0x51 (Games)
+@ opens the Game Boy probe, task 20 (game/device/gbprobe.c).
     .section .text.pl_menu_exit
     .global pl_menu_exit
     .thumb_func
 pl_menu_exit:
-    cmp     r4, #0x50
-    bne     1f
-    movs    r1, #0
     movs    r0, #19
-    ldr     r2, =0x030680D5         @ TaskSwitch(19, NULL)
+    cmp     r4, #0x50
+    beq     2f
+    movs    r0, #20
+    cmp     r4, #0x51
+    bne     1f
+2:  movs    r1, #0
+    ldr     r2, =0x030680D5         @ TaskSwitch(19 or 20, NULL)
     blx     r2
     movs    r5, #1
 1:  add     sp, #0x1c

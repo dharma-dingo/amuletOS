@@ -3,6 +3,10 @@
 
   build_module.py SRC_DIR OUT_DIR SOURCE.c [SOURCE.c ...] [--module 82] [--at 0x57C20]
   build_module.py SRC_DIR OUT_DIR SOURCE.c --module 86 --in-place --desc pl_desc --data-max 0xD00
+  build_module.py SRC_DIR OUT_DIR SOURCE.c --module 87 --span 0x95578:0xa3ec0 --desc gb_desc --opt O2
+
+--span: write the module into a code.bin span covering several unreachable stock modules (Game Boy probe,
+build 41: games 87..99, 58 KB); the other modules' table entries are left alone (nothing launches them).
 
 --in-place writes the module over the stock module's own code + data bytes in code.bin (they are contiguous for
 the stock games 81..111) instead of the gap: for replacing a stock game nobody can reach any more. --data-max: the
@@ -39,11 +43,13 @@ def main():
     p.add_argument("--in-place", action="store_true")
     p.add_argument("--desc", default="blockz_desc")
     p.add_argument("--data-max", type=lambda s: int(s, 0), default=DATA_MAX)
+    p.add_argument("--span", default=None, help="START:END code.bin span of unreachable stock modules to use")
+    p.add_argument("--opt", default="Os", help="gcc optimisation level (Os, O2)")
     a = p.parse_args()
 
     work = os.path.join(a.out, "module_build"); os.makedirs(work, exist_ok=True)
     elf = os.path.join(work, "module.elf")
-    run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
+    run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-" + a.opt, "-ffreestanding", "-nostdlib", "-nostartfiles",
         "-fno-tree-loop-distribute-patterns", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra",
         "-Wno-unused-parameter", "-Wl,--gc-sections", "-T", os.path.join(ROOT, "game", "device", "module.ld"),
         "-Wl,-Map=" + os.path.join(work, "module.map"), "-Wl,--no-warn-rwx-segments", "-o", elf, *a.sources)
@@ -72,7 +78,13 @@ def main():
     code = bytearray(open(os.path.join(a.out, "code.bin"), "rb").read())
     ent = 8 + 32 * a.module
     old = struct.unpack_from("<8I", code, ent)
-    if a.in_place:
+    if a.span:
+        t_off, span_end = (int(v, 0) for v in a.span.split(":"))
+        d_off = (t_off + len(text) + 3) & ~3
+        end = d_off + len(data)
+        assert end <= span_end, f"module {end - t_off:#x} B > span {span_end - t_off:#x} B"
+        code[t_off:span_end] = bytes(span_end - t_off)
+    elif a.in_place:
         o_cl, o_ce, o_cs, o_dl, o_de, o_ds = old[:6]
         t_off = o_cl - BASE
         span_end = o_dl - BASE + o_ds
@@ -92,7 +104,7 @@ def main():
     new = (BASE + t_off, CODE_EXEC, len(text), BASE + d_off, DATA_EXEC, len(data), bss_addr, bss_size)
     struct.pack_into("<8I", code, ent, *new)
     dj = os.path.join(a.out, "donor.json")              # tools/extend_module.py's donor: launch -> this module
-    if os.path.exists(dj):
+    if os.path.exists(dj) and not a.span:
         donor = json.load(open(dj))["donor"]
         struct.pack_into("<8I", code, 8 + 32 * donor, *new)
         print(f"  donor module {donor}'s entry -> module {a.module}")

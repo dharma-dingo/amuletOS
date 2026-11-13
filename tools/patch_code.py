@@ -220,7 +220,7 @@ def music_update():
     t = struct.pack("<I", h["music_menu"]).hex()
     return [
         (22, 0x03081B28, "483b0203", t), (22, 0x03081F6C, "483b0203", t), (22, 0x03082174, "483b0203", t),
-        (22, 0x0308165A, "072604462e70", "082604462e70"),          # 8 items
+        (22, 0x0308165A, "072604462e70", "092604462e70"),          # 9 items (build 41: + Games)
         (22, 0x030816EC, "0728ccbf2e712871", "0728c8bf07202871"),  # still 7 rows per page
         (22, 0x030818D8, "a7f84290", thumb_bl(0x030818D8, h["lib_force"]).hex()),
     ]
@@ -228,7 +228,8 @@ def music_update():
 def playlists():
     """v0.3 M3U playlists (build 35): Music menu row "Playlists" (9th entry, action 0x50 -> task 19 = module 86,
     game/device/playlists.c) and the song-change hook (0x0305E930 -> np_helpers.c pl_step). Apply after
-    music_update. The Music menu stays at 8 rows: Directory List was removed (build 37)."""
+    music_update. Directory List was removed (build 37); build 41 adds a temporary ninth row, Games (the Game Boy
+    probe, action 0x51 -> task 20)."""
     h = syms()
     return [
         (0, 0x0305E930, "2de9f84f", thumb_bw(0x0305E930, h["pl_step_hook"]).hex()),     # source step entry

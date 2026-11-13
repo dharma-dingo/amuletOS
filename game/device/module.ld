@@ -15,6 +15,7 @@ SECTIONS
         *(.text .text.*)
         *(.rodata .rodata.*)
         . = ALIGN(4);
+        _text_end = .;
     } > CODE
 
     .data : ALIGN(4)

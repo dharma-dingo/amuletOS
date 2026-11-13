@@ -434,3 +434,17 @@ out text wider than its current advances (clipping or scrolling).
 - **H1 (2026-11-07), build 12: PASSED.** Same INQUIRY-swap hook, linked at 0x0309F800 and loaded through module slot 2 (`build_hook.py h1`). Normal copy-update, booted normally; internal disk enumerates as `SCHALAOS ZEAL HOOK` rev `0.1`, SD stays `HIFI MP3 SD`. First custom code running on the AP30. Also shows USB DMA reads fine from 0x0309Fxxx.
 - **D1 (2026-11-07), build 13: PASSED.** INQUIRY name = `<clock hex> <ch1 hex> <ch0 hex>`, rev `D1`. Read live without admin and without replugging with `tools/inquiry.py D [--loop N --changes]` (SCSI INQUIRY pass-through on `\\.\D:`). Results: clock 200 MHz, battery ch0 ≈ 0x372 (≈ 4.3 V on USB), buttons above. The ADC sampler keeps running in USB mode. B on the USB screen exits to the main menu (drops USB). The prompt appeared in Chinese after this update (settings likely reset by updates; to check).
 - Device now: D1, stamp `26 20 07 11 13`.
+
+## Game Boy probe (build 41, 2026-11-13)
+
+- **Free RAM outside the library build:** modules overlapping 0x0308BF84..0x0309F7CC are m33 (music engine,
+  0x0308BF84+0x37A0), m34 / m36 (0x0308F724), m40..m57 (0x0308FFBC, at most 0x490) and m39 (the library
+  builder, 0x03081924..0x0309F7CC). No literal in the image points into 0x03090450..0x0309F7CC (the few hits are
+  instruction encodings), so that ~62 KB is only used while the library builds. The probe uses
+  0x03090800..0x0309F7C0 and the overlay window after its own code (to 0x0308BF84); the music engine stays.
+- **Unused file space for a large module:** stock games 87..99 (tasks 20..32) are contiguous in code.bin
+  0x95578..0xA3EC0 (58 KB) and unreachable since build 21's menu; m100 (donor) starts right after.
+- **Owner's /f/roms/gb:** Tetris (World) (Rev 1), Kirby's Dream Land 2, Final Fantasy Adventure (USA) and My
+  Friendly Little Island Deluxe are colourised hacks with header 0x143 = 0xC0 (Game Boy Color only); original
+  Game Boy games there: Super Mario Land, Catrap, Pipe Dream, QIX, Burger Time Deluxe, Picross 2, Embers of Mana,
+  The Frog for Whom the Bell Tolls.

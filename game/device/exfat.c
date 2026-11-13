@@ -13,7 +13,9 @@
 #endif
 
 #define EX_MAXSEC 8192          /* sectors per directory before giving up (4 MB) */
+#ifndef EX_NAME
 #define EX_NAME   24            /* name characters captured for listings */
+#endif
 
 typedef struct { uint32_t clus, len; uint8_t nofat; } exdir_t;
 
