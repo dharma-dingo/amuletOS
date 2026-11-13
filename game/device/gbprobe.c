@@ -1,4 +1,5 @@
-/* Game Boy probe (build 41): task 20 (module 87's slot; the code sits in the file space of stock games 87..99,
+/* Game Boy probe (build 41; build 42: direct framebuffer drawing, no sprite sorting, clock shown): task 20
+ * (module 87's slot; the code sits in the file space of stock games 87..99,
  * tools/build_module.py --span). Opened by the Music menu's temporary "Games" row (m22_ext.S).
  *
  * Lists /_gb/*.gb on the SD card, runs the chosen one with Peanut-GB (gb_core.c) at 1x in the middle of the
@@ -17,6 +18,7 @@
 #include "../stock.h"
 #define EX_NAME 26
 #include "exfat.c"
+#define PEANUT_GB_HIGH_LCD_ACCURACY 0   /* build 42: no per-line sprite sort (speed) */
 #include "gb_core.c"
 
 void *memcpy(void *d, const void *s, size_t n) { uint8_t *a = d; const uint8_t *b = s; while (n--) *a++ = *b++; return d; }
@@ -176,12 +178,31 @@ void gbx_read_page(gbx_t *x, uint32_t page, uint8_t *dst)
     S.load_us += now_us() - t0;
 }
 
+/* Draw straight into stock's RAM framebuffer (build 42; build 41 went through stock's Window + Pixel: 15 ms a
+ * frame). Layout, from Pixel 0x03064DC4 / flush 0x0306558A (docs/HARDWARE.md "Display"): rows 0..189 at
+ * 0x03006688 + page * 0x1B760, rows 190..239 at 0x0306FD50 + page * 0x73A0, 592 bytes a row; the panel is mounted
+ * mirrored (column = 295 - x while the rotation flag is set) and pixels are swapped in pairs (index ^ 1). After a
+ * frame, Window() over the Game Boy area marks the rows dirty for the flush, as Pixel would. */
+#define FBS        0x03022E48u
+#define FB_PAGE    (*(volatile uint16_t *)(FBS + 0x00))
+#define FB_DIRTY   (*(volatile uint32_t *)(FBS + 0x0C))
+#define FB_ROT     (*(volatile uint32_t *)(FBS + 0x14))
+
 void gbx_line(const uint16_t *rgb, int line)
 {
     uint32_t t0 = now_us();
-    Window(GB_X, GB_Y + line, GB_X + LCD_WIDTH - 1, GB_Y + line);
-    for (int i = 0; i < LCD_WIDTH; i++) Pixel(rgb[i]);
+    int y = GB_Y + line;
+    uint16_t *row = y < 190 ? (uint16_t *)(0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y * 592u)
+                            : (uint16_t *)(0x0306FD50u + FB_PAGE * 0x73A0u + (uint32_t)(y - 190) * 592u);
+    if (FB_ROT) { int c = 295 - GB_X; for (int i = 0; i < LCD_WIDTH; i++, c--) row[c ^ 1] = rgb[i]; }
+    else        { int c = GB_X;       for (int i = 0; i < LCD_WIDTH; i++, c++) row[c ^ 1] = rgb[i]; }
     S.line_us += now_us() - t0;
+}
+
+static void mark_dirty(void)
+{
+    Window(GB_X, GB_Y, GB_X + LCD_WIDTH - 1, GB_Y + LCD_HEIGHT - 1);
+    FB_DIRTY = 1;
 }
 
 /* ---- list ---- */
@@ -315,11 +336,13 @@ static void stats(uint32_t now)
     fill(0, 0, 295, GB_Y - 3, C_SCREEN);
     fill(0, GB_Y + LCD_HEIGHT + 2, 295, 239, C_SCREEN);
     say(4, 4, C_INK, "%s  FPS %1", (uint32_t)title, span ? S.frames * 10000000u / span : 0, 0, 0, 0);
-    say(4, 24, C_INK, "EMU %1 DRAW %1 PUSH %1 MS", S.emu_us / f / 100, S.draw_us / f / 100, S.push_us / f / 100, 0, 0);
+    say(4, 24, C_INK, "EMU %1 DRAW %1 PUSH %1 MHZ %d", S.emu_us / f / 100, S.draw_us / f / 100, S.push_us / f / 100,
+        (ST_LOAD + 1u) / 10000u, 0);
     say(4, 198, C_INK, "PAGES %d LOADS %d %1MS SAVE %d", B->g.nslots, B->g.misses - S.loads0, S.load_us / 100,
         B->g.cram_len, 0);
     uint8_t pad = (uint8_t)~B->g.gb.direct.joypad;
-    say(4, 218, C_DIM, "ADC %d G%d KEYS %x EV %x", ADC_CH1, gpio_key(), pad, S.last_ev, 0);
+    say(4, 218, C_DIM, "ADC %d G%d KEYS %x CLK %d", ADC_CH1, gpio_key(), pad,
+        *(volatile uint32_t *)0x030065D8u / 1000000u, 0);
     S.stat_t0 = now_us();
     S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = 0;
     S.loads0 = B->g.misses;
@@ -340,6 +363,7 @@ static void run(void)
     uint32_t t0 = now_us();
     gb_run_frame(&B->g.gb);
     uint32_t t1 = now_us();
+    mark_dirty();
     Flush();
     uint32_t t2 = now_us();
     S.emu_us += (t1 - t0) - S.line_us;
