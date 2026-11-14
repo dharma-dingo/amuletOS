@@ -490,4 +490,12 @@ and USB audio (module 11: 0x03082F4E). All helpers are resident (module 0).
 - **Data:** one 32-bit word per sample, left then right, signed 24-bit right-justified (s16 << 8). DMA count in words.
   Settings block 0x03005764 is module 0 initialised data (valid from boot).
 - DMA channel 5 is the audio channel (stock's allocator 0x030614F8 hands out 0..4).
+- **DAC power-up is needed even when the flag says on** (builds 48 / 49): with no music since boot the flag was 1,
+  skipping MusicInit's sequence left the I2S taking words ~10x too fast (984 completions in 2 s for 94) and the DAC
+  silent; after the full sequence the rate is exact (one 1024-frame buffer every 21333 us).
+- **Ring for game sound (build 50):** 0x0308BF84..0x0308FF84 (m33 code + start of m34) while the player is stopped;
+  restore with ModuleOverlay(33, 1) and (34, 1) (code only). Now Playing's start also reloads m33 when the player
+  thread is not running.
+- Now Playing B: press 0x40000040 -> 0x030838B0 (stock: back to the browser / Music list), hold 0x20000040 ->
+  0x03083A64 = TaskSwitch(0, {0}) main menu; key 0x40000002 -> TaskSwitch(10, {1}) = Settings (task 10, m32).
 

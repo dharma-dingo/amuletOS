@@ -11,9 +11,22 @@
  * for 13 x 4 KB in the same memory (game/test/test_gb.c, 2026-11-13). */
 #include <stdint.h>
 
-#define ENABLE_SOUND 0
 #define ENABLE_LCD   1
 #define PEANUT_GB_IS_LITTLE_ENDIAN 1
+/* Sound (build 50): GBX_SOUND = output rate. minigb_apu (game/third_party/minigb_apu, MIT) renders one frame's worth
+ * of samples from the sound registers (gbx_audio(): AUDIO_SAMPLES stereo int16 = 803 at 48 kHz). */
+#ifdef GBX_SOUND
+#define ENABLE_SOUND 1
+#define MINIGB_APU_AUDIO_FORMAT_S16SYS
+#define AUDIO_SAMPLE_RATE GBX_SOUND
+#include "../third_party/minigb_apu/minigb_apu.h"
+static struct minigb_apu_ctx *gbx_apu;
+uint8_t audio_read(const uint16_t addr) { return minigb_apu_audio_read(gbx_apu, addr); }
+void audio_write(const uint16_t addr, const uint8_t val) { minigb_apu_audio_write(gbx_apu, addr, val); }
+#include "../third_party/minigb_apu/minigb_apu.c"
+#else
+#define ENABLE_SOUND 0
+#endif
 #include "../third_party/peanut_gb/peanut_gb.h"
 
 #ifndef PG_SHIFT
@@ -39,6 +52,9 @@ typedef struct gbx_s {
     uint32_t err_addr;
     uint16_t pal[4];
     uint16_t line[LCD_WIDTH];
+#ifdef GBX_SOUND
+    struct minigb_apu_ctx apu;
+#endif
 } gbx_t;
 
 void gbx_read_page(gbx_t *x, uint32_t page, uint8_t *dst);
@@ -115,8 +131,17 @@ static int gbx_init(gbx_t *x, uint32_t rom_len, uint8_t **pages, uint32_t npg)
     if (r != GB_INIT_NO_ERROR) return (int)r + 1;
     gb_init_lcd(&x->gb, gbx_draw_line);
     x->gb.direct.joypad = 0xFF;
+#ifdef GBX_SOUND
+    gbx_apu = &x->apu;
+    minigb_apu_audio_init(&x->apu);
+#endif
     return 0;
 }
+
+#ifdef GBX_SOUND
+/* One frame of sound: AUDIO_SAMPLES_TOTAL int16, left / right interleaved. */
+static void gbx_audio(gbx_t *x, int16_t *out) { minigb_apu_audio_callback(&x->apu, out); }
+#endif
 
 static uint32_t gbx_save_size(gbx_t *x)
 {

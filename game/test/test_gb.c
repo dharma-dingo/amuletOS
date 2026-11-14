@@ -6,7 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#define GBX_SOUND 48000
 #include "../device/gb_core.c"
+#include <time.h>
 
 static uint8_t *ROM; static long ROMLEN;
 static uint16_t FB[LCD_HEIGHT][LCD_WIDTH];
@@ -41,15 +44,31 @@ int main(int argc, char **argv)
     X.cram = cram; memset(cram, 0xFF, sizeof cram);
     char title[17]; gb_get_rom_name(&X.gb, title);
     uint32_t peak = 0, last = 0;
+    /* sound: whole run to OUT.wav (48 kHz stereo 16-bit), peak level, APU time per frame */
+    static int16_t snd[AUDIO_SAMPLES_TOTAL];
+    char wname[512]; snprintf(wname, sizeof wname, "%s.wav", argv[4]);
+    FILE *w = fopen(wname, "wb");
+    uint32_t wbytes = (uint32_t)frames * AUDIO_SAMPLES_TOTAL * 2;
+    uint32_t hdr[11] = { 0x46464952, 36 + wbytes, 0x45564157, 0x20746d66, 16, 0x00020001, 48000, 48000 * 4, 0x00100004,
+                         0x61746164, wbytes };
+    fwrite(hdr, 4, 11, w);
+    int speak = 0; double sq = 0; long nz = 0; clock_t apu = 0;
     for (int n = 0; n < frames; n++) {
         /* tap Start for 6 frames every 4 s (title screens), A for 6 frames every 3 s */
         X.gb.direct.joypad = 0xFF;
         if (n % 240 >= 200 && n % 240 < 206) X.gb.direct.joypad &= ~JOYPAD_START;
         if (n % 180 >= 90 && n % 180 < 96) X.gb.direct.joypad &= ~JOYPAD_A;
         gb_run_frame(&X.gb);
+        clock_t c0 = clock(); gbx_audio(&X, snd); apu += clock() - c0;
+        for (unsigned i = 0; i < AUDIO_SAMPLES_TOTAL; i++) { int v = snd[i] < 0 ? -snd[i] : snd[i]; if (v > speak) speak = v; sq += (double)snd[i] * snd[i]; nz += snd[i] != 0; }
+        fwrite(snd, 2, AUDIO_SAMPLES_TOTAL, w);
         if (X.err) { printf("FAIL Peanut error %d at %04x, frame %d\n", (int)X.err - 1, (unsigned)X.err_addr, n); return 1; }
         if (n % 60 == 59) { if (loads - last > peak) peak = loads - last; last = loads; }
     }
+    fclose(w);
+    printf("sound: %u samples a frame, peak %d, rms %.0f, non-zero %.1f%%, APU %.3f ms a frame (PC), %s\n",
+           AUDIO_SAMPLES, speak, sqrt(sq / ((double)frames * AUDIO_SAMPLES_TOTAL)), 100.0 * nz / ((double)frames * AUDIO_SAMPLES_TOTAL),
+           1000.0 * apu / CLOCKS_PER_SEC / frames, wname);
     uint32_t sum = 0;
     for (int y = 0; y < LCD_HEIGHT; y++) for (int x = 0; x < LCD_WIDTH; x++) sum = sum * 31 + FB[y][x];
     printf("%s: %ld KB, cart RAM %u B, %d frames, %d slots: %u page loads (%.2f / s of game time, worst second %u), "

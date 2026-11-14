@@ -28,7 +28,9 @@ PATCHES = {
     # 0x030838B0: clear 0x115, popup checks (messages 1, 0x50 / 0x51), then by source: Folders (0x63) / 6 -> folder
     # browser, else the Music list. Owner: always the main menu. After the popup checks, jump to the Menu key's own
     # path (0x0308389C: TaskSwitch(10, {1}) = main menu; the carousel keeps its own position).
-    "np_back_home": [(27, 0x030838E2, "2b4c", "dbe7")],   # ldr r4, =record -> b 0x0308389C
+    "np_back_home": [(27, 0x030838E2, "2b4c", "bfe0")],   # ldr r4, =record -> b 0x03083A64 (= hold B: TaskSwitch(0, {0}), main menu).
+    # Build 40 branched to 0x0308389C = Select's TaskSwitch(10): the playback options screen (owner on 49: B opened
+    # options, B there came back, B opened them again; hold B, event 0x20000040, was the only way out).
     # Stock Now Playing (module 27). Info box: line 1 artist (0x15e), line 2 album (0x25c),
     # line 3 genre (0x35a), each drawn by text 0x03063F76 with a fallback 0x030644A0 when empty.
     # Owner: show only artist and song title. Skip the album and genre draws (areas stay cleared).
