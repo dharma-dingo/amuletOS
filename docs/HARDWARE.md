@@ -460,3 +460,34 @@ out text wider than its current advances (clipping or scrolling).
   (one contiguous block). Rows >= 190 take a second pass after a ~1 ms busy wait (0x03065B58(1) = clk / 3000 loops).
   Full width x 144 rows took 3.2 ms (~22 us a row).
   Started without the wait (build 47) the DMA finishes during the next frame's emulation: Mario 59.6 fps, no tearing.
+
+## Sound output (traced 2026-11-13, build 48)
+
+Traced from the music engine (module 33: MusicInit 0x0308DDD0, Audio Start 0x0308C8EE, Music Thread Exit 0x0308E798)
+and USB audio (module 11: 0x03082F4E). All helpers are resident (module 0).
+
+| Run address | What it is |
+|---|---|
+| 0x03052BFC / 0x03056C2C / 0x03056C66 | GPIO (port, pin, x): pin mux / direction (1 = out) / level |
+| 0x03062858 | watchdog kick (0x76 -> 0x4012000C); stock calls it around audio start |
+| 0x03051F8E | DAC (re)start (CS43198 power-up) |
+| 0x03056960 | I2S init (1, 2, 1, rate, 0, format, 0): format 0x17 = 24-bit (music), 0x0F = 16-bit (USB audio) |
+| 0x0305094E / 0x03050A00 | I2S1 TX start (DMACR \|= 0x110, XFER on) / stop: args (1, 4) |
+| 0x030622E4 | codec sample-rate setup (8000 .. 192000) |
+| 0x0306242E | SetVolume(level); level = sys+0x12. 0 = codec 0xFF + amp off. Unmutes the amp only while the player thread runs |
+| 0x03052B20 | CRU (n, on) at 0x40180000 + 0xC0: stock calls (4, 1) before codec setup |
+| 0x03056774 | DMA channel busy (ChEnReg 0x600003A0 bit) |
+| 0x0306602C | stock's audio DMA completion: restarts channel 5 on the next buffer |
+| 0x030661A4 | stock's audio refill interrupt: decoder -> 0x030660E6 (to 24-bit right-justified) |
+
+- **State:** u8 0x030227DA = DAC powered. MusicInit powers up only when it is 0: GPIO0 pin 12 low, GPIO1 pin 4 high,
+  flag = 1, GPIO2 pin 14 high, GPIO2 pin 2 high, 11 ms, watchdog, DAC restart, I2S init 48 kHz 24-bit, TX start,
+  100 ms, TX stop, CRU (4, 1). The player's exit powers it down (flag 0, GPIO1 pin 4 low, amp off, 0x03051C8A,
+  GPIO2 pin 2 low).
+- **Amp:** GPIO2 pin 1, low = on, high = off.
+- **Per track (Audio Start):** CRU (4, 1), CodecRate(rate), SetVolume(sys+0x12), wait for channel 5 idle, I2S init
+  (rate, 0x17), DmaStart(5, buffer, 0x40030024, words, 0x03005764, 0x0306602D), watchdog, 80 ms, TX start.
+- **Data:** one 32-bit word per sample, left then right, signed 24-bit right-justified (s16 << 8). DMA count in words.
+  Settings block 0x03005764 is module 0 initialised data (valid from boot).
+- DMA channel 5 is the audio channel (stock's allocator 0x030614F8 hands out 0..4).
+
