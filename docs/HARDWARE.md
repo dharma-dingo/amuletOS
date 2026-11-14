@@ -459,3 +459,4 @@ out text wider than its current advances (clipping or scrolling).
   0x03080EAD) and a wait loop (0x03056704) until u16 0x03023B44 == 1 (set by the completion). Full-width rows only
   (one contiguous block). Rows >= 190 take a second pass after a ~1 ms busy wait (0x03065B58(1) = clk / 3000 loops).
   Full width x 144 rows took 3.2 ms (~22 us a row).
+  Started without the wait (build 47) the DMA finishes during the next frame's emulation: Mario 59.6 fps, no tearing.
