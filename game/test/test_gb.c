@@ -9,10 +9,12 @@
 #include <math.h>
 #define GBX_SOUND 48000
 #include "../device/gb_core.c"
+#include "../device/gb_scale.h"
 #include <time.h>
 
 static uint8_t *ROM; static long ROMLEN;
-static uint16_t FB[LCD_HEIGHT][LCD_WIDTH];
+static uint16_t FB[LCD_HEIGHT][LCD_WIDTH];          /* shades 0..3 (build 53: the device scales and colours them) */
+static const uint16_t GREY[4] = { 0xFFDF, 0xAD55, 0x52CD, 0x2125 };
 static uint32_t loads;
 
 void gbx_read_page(gbx_t *x, uint32_t page, uint8_t *dst)
@@ -39,6 +41,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < PG_SLOTS; i++) pages[i] = pagebuf[i];
     int r = gbx_init(&X, (uint32_t)ROMLEN, pages, (uint32_t)slots);
     if (r) { printf("FAIL init error %d\n", r - 1); return 1; }
+    for (int i = 0; i < 4; i++) X.pal[i] = (uint16_t)i;        /* as the device: shades out, colours later */
     static uint8_t cram[0x8000];
     X.cram_len = gbx_save_size(&X); if (X.cram_len > sizeof cram) X.cram_len = sizeof cram;
     X.cram = cram; memset(cram, 0xFF, sizeof cram);
@@ -72,17 +75,36 @@ int main(int argc, char **argv)
            AUDIO_SAMPLES, speak, sqrt(sq / ((double)frames * AUDIO_SAMPLES_TOTAL)), 100.0 * nz / ((double)frames * AUDIO_SAMPLES_TOTAL),
            1000.0 * apu / CLOCKS_PER_SEC / frames, wname);
     uint32_t sum = 0;
-    for (int y = 0; y < LCD_HEIGHT; y++) for (int x = 0; x < LCD_WIDTH; x++) sum = sum * 31 + FB[y][x];
+    for (int y = 0; y < LCD_HEIGHT; y++) for (int x = 0; x < LCD_WIDTH; x++) sum = sum * 31 + GREY[FB[y][x]];
     printf("%s: %ld KB, cart RAM %u B, %d frames, %d slots: %u page loads (%.2f / s of game time, worst second %u), "
            "frame sum %08x\n", title, ROMLEN / 1024, (unsigned)X.cram_len, frames, slots, (unsigned)loads,
            loads * 59.73 / frames, (unsigned)peak, (unsigned)sum);
     FILE *o = fopen(argv[4], "wb");
     fprintf(o, "P6 %d %d 255\n", LCD_WIDTH, LCD_HEIGHT);
     for (int y = 0; y < LCD_HEIGHT; y++) for (int x = 0; x < LCD_WIDTH; x++) {
-        uint16_t c = FB[y][x];
+        uint16_t c = GREY[FB[y][x]];
         uint8_t rgb[3] = { (uint8_t)((c >> 11) << 3), (uint8_t)(((c >> 5) & 63) << 2), (uint8_t)((c & 31) << 3) };
         fwrite(rgb, 1, 3, o);
     }
     fclose(o);
-    return 0;
+    /* the device picture (gb_scale.h): 296 x 240 screen, full height, DMG look; to OUT.ppm.full.ppm */
+    static uint16_t SCR[240][296]; static gbs_t T;
+    for (int y = 0; y < 240; y++) for (int x = 0; x < 296; x++) SCR[y][x] = 0xFFDF;
+    gbs_init(&T, 0, 0);
+    int covered = 0;
+    for (int l = 0; l < LCD_HEIGHT; l++) {
+        int y0, n = gbs_rows(l, &y0);
+        gbs_line(&T, FB[l], SCR[y0], n == 2 ? SCR[y0 + 1] : 0); covered += n;
+    }
+    char fname[512]; snprintf(fname, sizeof fname, "%s.full.ppm", argv[4]);
+    o = fopen(fname, "wb");
+    fprintf(o, "P6 296 240 255\n");
+    for (int y = 0; y < 240; y++) for (int x = 0; x < 296; x++) {
+        uint16_t c = SCR[y][x];
+        uint8_t rgb[3] = { (uint8_t)((c >> 11) << 3), (uint8_t)(((c >> 5) & 63) << 2), (uint8_t)((c & 31) << 3) };
+        fwrite(rgb, 1, 3, o);
+    }
+    fclose(o);
+    printf("full-height picture: %d rows covered (240), %s\n", covered, fname);
+    return covered == 240 ? 0 : 1;
 }

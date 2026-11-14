@@ -12,6 +12,7 @@
  * Last row "Benchmark" (build 43): cycles per loop iteration and per read in each memory area (see bench()).
  * List row "Sound test" (build 48): a tone through stock's audio path, 1 s left then 1 s right (snd_open()).
  * Build 50: game sound (minigb_apu), paced by the sound output. Hold Select for 1.5 s to quit. No saves.
+ * Build 53 (owner): no stats; the picture fills the screen height (266 x 240) in a DMG look (gb_scale.h).
  *
  * Memory (docs/HARDWARE.md "Game Boy probe"): the emulator state, the list and part of the page cache use
  * 0x03090800..0x0309F7C0, which only the library builder (module 39) ever loads into; more cache pages use the
@@ -23,6 +24,7 @@
 #define PEANUT_GB_HIGH_LCD_ACCURACY 0   /* build 42: no per-line sprite sort (speed) */
 #define GBX_SOUND 48000                 /* build 50 */
 #include "gb_core.c"
+#include "gb_scale.h"
 
 void *memcpy(void *d, const void *s, size_t n) { uint8_t *a = d; const uint8_t *b = s; while (n--) *a++ = *b++; return d; }
 void *memset(void *d, int v, size_t n) { uint8_t *a = d; while (n--) *a++ = (uint8_t)v; return d; }
@@ -68,9 +70,6 @@ extern char _text_end[];             /* module.ld: end of this module's code */
 #define C_TINT   RGB565(0xe9, 0xe3, 0xfb)
 #define C_GRAPE  RGB565(0x73, 0x53, 0xe0)
 
-#define GB_X     68                  /* (296 - 160) / 2 */
-#define GB_Y     44                  /* build 46: rows 44..187, above row 190 where stock's flush starts a second,
-                                       delayed push (0x03065B58(1) busy-waits ~1 ms first); was 48 */
 #define FRAME_US 16743u              /* 70224 cycles at 4.194304 MHz */
 #define ROWS     7
 #define NLIST    24
@@ -89,7 +88,7 @@ typedef struct {                     /* everything big, at U_BASE */
     uint32_t clus[512];              /* clusters of a fragmented ROM (2 MB in 4 KB clusters at most) */
     uint8_t sec[512];
     int16_t snd[AUDIO_SAMPLES_TOTAL];  /* one frame of sound before conversion (build 50) */
-    struct { uint8_t w, g[32]; } font[64];   /* glyphs 0x20..0x5F of stock font 2 (build 51: stats) */
+    gbs_t scale;                       /* full-height picture tables (build 53) */
 } big_t;
 #define B ((big_t *)U_BASE)
 
@@ -98,7 +97,8 @@ static struct {
     int sel, top;
     uint32_t adc_since, sel_since, next, stat_t0;
     uint32_t frames, emu_us, draw_us, push_us, load_us, loads0, late, line_us, wait_us, snd_us, stat_us, under0;
-    uint8_t dma_busy, top_dirty;      /* build 52: stats rows drawn, send them with the next frame */
+    uint8_t dma_busy, push_ph;        /* build 53: push phase 1 = rows 0..189 going, 2 = rows 190..239 going */
+    uint32_t push_done_t;
     uint32_t skips;
     uint32_t last_ev, err;
     const rom_t *rom;
@@ -197,15 +197,22 @@ void gbx_read_page(gbx_t *x, uint32_t page, uint8_t *dst)
 #define FB_DIRTY   (*(volatile uint32_t *)(FBS + 0x0C))
 #define FB_ROT     (*(volatile uint32_t *)(FBS + 0x14))
 
-void gbx_line(const uint16_t *rgb, int line)
+static void push_service(void);
+static uint16_t *fb_any(int y)                           /* any row: 0..189 in the page, 190..239 in the second area */
+{
+    return y < 190 ? (uint16_t *)(0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y * 592u)
+                   : (uint16_t *)(0x0306FD50u + FB_PAGE * 0x73A0u + (uint32_t)(y - 190) * 592u);
+}
+
+/* Build 53: the core hands over shades 0..3 (B->g.pal = 0..3); each Game Boy line becomes 1 or 2 screen rows,
+ * 266 wide, DMG colours and grid (gb_scale.h). Then the second half of the last push may be due (push_service). */
+void gbx_line(const uint16_t *sh, int line)
 {
     uint32_t t0 = now_us();
-    int y = GB_Y + line;
-    uint16_t *row = y < 190 ? (uint16_t *)(0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y * 592u)
-                            : (uint16_t *)(0x0306FD50u + FB_PAGE * 0x73A0u + (uint32_t)(y - 190) * 592u);
-    if (FB_ROT) { int c = 295 - GB_X; for (int i = 0; i < LCD_WIDTH; i++, c--) row[c ^ 1] = rgb[i]; }
-    else        { int c = GB_X;       for (int i = 0; i < LCD_WIDTH; i++, c++) row[c ^ 1] = rgb[i]; }
+    int y0, n = gbs_rows(line, &y0);
+    gbs_line(&B->scale, sh, fb_any(y0), n == 2 ? fb_any(y0 + 1) : 0);
     S.line_us += now_us() - t0;
+    push_service();
 }
 
 /* Background push (build 47). The panel driver's push (module 4, ops[5] = 0x03080FEC, called by stock's flush)
@@ -220,28 +227,49 @@ void gbx_line(const uint16_t *rgb, int line)
 #define DmaGet()               STOCK_FN(0x030614F8, uint32_t, void)()
 #define DmaStart(ch, src, dst, n, cfg, cb)     STOCK_FN(0x03061524, void, uint32_t, uint32_t, uint32_t, uint32_t, void *, uint32_t)(ch, src, dst, n, cfg, cb)
 
-static void push_wait(void)
-{
-    if (!S.dma_busy) return;
-    uint32_t t0 = now_us();
-    while (LCD_DONE != 1) { if (now_us() - t0 > 50000) break; }   /* never hang: 50 ms cap */
-    S.wait_us += now_us() - t0;
-    S.dma_busy = 0;
-}
+/* Build 53: the whole screen, in two parts as stock's flush does: rows 0..189 (page), then ~1 ms after that DMA has
+ * finished, rows 190..239 (second area) with their own window. The second part is started from the line callback
+ * (push_service, every ~90 us of emulation) so nothing waits; the next frame reaches row 190 only ~11 ms in. */
+static uint32_t push_cfg[4];
 
-static void push_async(int y0)                           /* rows y0 (< 190) .. the last Game Boy row */
+static void push_part(int y0, int y1, uint32_t src)
 {
-    static uint32_t cfg[4];
-    push_wait();
-    const volatile uint32_t *c = (const volatile uint32_t *)0x0306E96Cu;   /* the driver's DMA settings */
-    for (int i = 0; i < 4; i++) cfg[i] = c[i];
-    uint32_t src = 0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y0 * 592u;
-    int y1 = GB_Y + LCD_HEIGHT - 1;
     LCD_DONE = 0;
     LcdWindow(0, y0, 0x127, y1);
     VopCmd(0, 6);
     uint32_t ch = DmaGet() & 0xFF;
-    DmaStart(ch, src, 0x6007002Cu, 0x128u * (uint32_t)(y1 - y0 + 1) / 2u, cfg, 0x03080EADu);
+    DmaStart(ch, src, 0x6007002Cu, 0x128u * (uint32_t)(y1 - y0 + 1) / 2u, push_cfg, 0x03080EADu);
+}
+
+static void push_service(void)
+{
+    if (S.push_ph != 1 || LCD_DONE != 1) return;
+    uint32_t t = now_us();
+    if (!S.push_done_t) { S.push_done_t = t | 1; return; }
+    if (t - S.push_done_t < 1000) return;
+    push_part(190, 239, (uint32_t)fb_any(190));
+    S.push_ph = 2;
+}
+
+static void push_wait(void)
+{
+    if (!S.dma_busy) return;
+    uint32_t t0 = now_us();
+    while (S.push_ph == 1) { push_service(); if (now_us() - t0 > 50000) break; }   /* never hang: 50 ms cap */
+    while (LCD_DONE != 1) { if (now_us() - t0 > 50000) break; }
+    S.wait_us += now_us() - t0;
+    S.dma_busy = 0;
+    S.push_ph = 0;
+}
+
+static void push_async(void)
+{
+    push_wait();
+    const volatile uint32_t *c = (const volatile uint32_t *)0x0306E96Cu;   /* the driver's DMA settings */
+    for (int i = 0; i < 4; i++) push_cfg[i] = c[i];
+    push_part(0, 189, (uint32_t)fb_any(0));
+    S.push_ph = 1;
+    S.push_done_t = 0;
     S.dma_busy = 1;
 }
 
@@ -402,65 +430,6 @@ static void snd_service(void)                            /* tone test */
     if (el >= 1000000 && !SN.side) { SN.side = 1; redraw(); }
 }
 
-/* Build 51: stats drawn straight into the framebuffer from a glyph cache (owner on 50: STAT 62.5 ms: stock FillRect
- * runs per glyph row, font reads from flash and the full stock flush, once a second; the sound queue held 16 ms, so
- * every redraw made 6..25 chunks late). 51 sent the rows with a push of their own and the owner saw no stats; from
- * build 52 they go out with the next game frame's push, which starts at row 0 on that frame. */
-static void font_cache(void)
-{
-    SetFont(2);
-    uint32_t base = FONTBASE;
-    for (int i = 0; i < 64; i++) {
-        uint32_t c = 0x20u + (uint32_t)i;
-        B->font[i].w = (uint8_t)((int)CharW(c) + SPACING);
-        FontRead(base + c * 33u, B->font[i].g, 32);
-    }
-}
-
-static uint16_t *fb_row(int y) { return (uint16_t *)(0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y * 592u); }
-
-static void fb_fill(int y0, int y1, uint16_t col)        /* full-width rows, y < 190 */
-{
-    for (int y = y0; y <= y1; y++) { uint16_t *r = fb_row(y); for (int x = 0; x < 296; x++) r[x] = col; }
-}
-
-static int fb_text(int x, int y, const uint16_t *s, uint16_t fg, uint16_t bg)
-{
-    for (; *s; s++) {
-        uint32_t c = *s;
-        if (c >= 'a' && c <= 'z') c -= 32;
-        if (c < 0x20 || c > 0x5F) c = '?';
-        int w = B->font[c - 0x20].w;
-        if (w > 16) w = 16;
-        if (x + w > 295) break;
-        const uint8_t *g = B->font[c - 0x20].g;
-        for (int r = 0; r < 16; r++) {
-            uint32_t v = (uint32_t)g[2 * r] << 8 | g[2 * r + 1];
-            uint16_t *row = fb_row(y + r);
-            for (int k = 0; k < w; k++) {
-                int col = FB_ROT ? 295 - (x + k) : x + k;
-                row[col ^ 1] = (v & (0x8000u >> k)) ? fg : bg;
-            }
-        }
-        x += w;
-    }
-    return x;
-}
-
-static void fb_say(int x, int y, const char *f, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4)
-{
-    uint32_t a[5] = { a0, a1, a2, a3, a4 };
-    uint16_t b[64];
-    fmt(b, f, a);
-    fb_text(x, y, b, C_INK, C_SCREEN);
-}
-
-static void mark_dirty(void)
-{
-    Window(GB_X, GB_Y, GB_X + LCD_WIDTH - 1, GB_Y + LCD_HEIGHT - 1);
-    FB_DIRTY = 1;
-}
-
 /* ---- list ---- */
 static int list_cb(const exent_t *e, int match, void *ctx)
 {
@@ -543,11 +512,7 @@ static uint8_t gpio_key(void) { return (uint8_t)((GPIO2 >> 5) & 1); }
 /* ---- running ---- */
 static void frame_box(void)
 {
-    fill(0, 0, 295, 239, C_SCREEN);
-    fill(GB_X - 2, GB_Y - 2, GB_X + LCD_WIDTH + 1, GB_Y - 1, C_INK);
-    fill(GB_X - 2, GB_Y + LCD_HEIGHT, GB_X + LCD_WIDTH + 1, GB_Y + LCD_HEIGHT + 1, C_INK);
-    fill(GB_X - 2, GB_Y, GB_X - 1, GB_Y + LCD_HEIGHT - 1, C_INK);
-    fill(GB_X + LCD_WIDTH, GB_Y, GB_X + LCD_WIDTH + 1, GB_Y + LCD_HEIGHT - 1, C_INK);
+    fill(0, 0, 295, 239, C_SCREEN);                               /* build 53: side bars; the picture covers the rest */
 }
 
 static void start(const rom_t *r)
@@ -568,6 +533,8 @@ static void start(const rom_t *r)
     for (; a + PG_SIZE <= U_END && n < PG_SLOTS; a += PG_SIZE) pages[n++] = (uint8_t *)a;
     int e = gbx_init(&B->g, r->len, pages, n);
     if (e) { S.err = (uint32_t)e; S.state = ST_ERR; redraw(); return; }
+    for (int i = 0; i < 4; i++) B->g.pal[i] = (uint16_t)i;       /* build 53: shades out, gb_scale.h colours them */
+    gbs_init(&B->scale, FB_ROT != 0, 1);
     uint32_t cram = gbx_save_size(&B->g);
     if (cram > 0x8000) cram = 0;                                  /* bigger cartridge RAM: not in the probe */
     uint32_t give = (cram + PG_SIZE - 1) >> PG_SHIFT;             /* cartridge RAM takes the last pages */
@@ -583,26 +550,10 @@ static void start(const rom_t *r)
     S.gpio_idle = gpio_key();
     S.adc_state = S.adc_cand = 8;
     S.state = ST_RUN;
-    font_cache();
     frame_box();
     snd_open(0);                                                  /* build 50: game sound (stops the music) */
     S.next = S.stat_t0 = now_us();
     S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = S.late = S.snd_us = S.stat_us = 0;
-    S.loads0 = B->g.misses; S.under0 = snd_under;
-}
-
-static void stats(uint32_t now)
-{
-    uint32_t span = now - S.stat_t0, f = S.frames ? S.frames : 1;
-    push_wait();
-    fb_fill(0, GB_Y - 3, C_SCREEN);
-    fb_say(4, 4, "FPS %1 LATE %d SKIP %d LOADS %d", span ? S.frames * 10000000u / span : 0, snd_under - S.under0,
-           S.skips, B->g.misses - S.loads0, 0);
-    fb_say(4, 23, "EMU %1 DRAW %1 SND %1 STAT %1", S.emu_us / f / 100, S.draw_us / f / 100, S.snd_us / f / 100,
-           S.stat_us / 100, 0);
-    S.top_dirty = 1;
-    S.stat_t0 = now_us();
-    S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = S.wait_us = S.snd_us = S.skips = 0;
     S.loads0 = B->g.misses; S.under0 = snd_under;
 }
 
@@ -635,7 +586,7 @@ static void run(void)
     uint32_t t0 = now_us();
     gb_run_frame(&B->g.gb);
     uint32_t t1 = now_us();
-    if (!skip || S.top_dirty) { push_async(S.top_dirty ? 0 : GB_Y); S.top_dirty = 0; }
+    if (!skip) push_async();
     uint32_t t2 = now_us();
     S.emu_us += (t1 - t0) - S.line_us;
     S.draw_us += S.line_us;
@@ -644,7 +595,6 @@ static void run(void)
     if (B->g.err) { snd_close(); S.err = 200 + (uint32_t)B->g.err; S.state = ST_ERR; redraw(); return; }
     S.next += FRAME_US;
     if ((int32_t)(t2 - S.next) > (int32_t)(3 * FRAME_US)) { S.next = t2; S.late++; }
-    if (t2 - S.stat_t0 >= 1000000) { uint32_t s0 = now_us(); stats(t2); S.stat_us = now_us() - s0; }
 }
 
 static void core_b_test(void)
