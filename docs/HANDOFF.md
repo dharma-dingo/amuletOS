@@ -332,6 +332,12 @@ been on an August build).
    flash.
 
 ### 6.4 After that
+- **Next build: Games on the main menu** (owner, 2026-11-14). Games gets its own carousel item right after
+  Blockz: Now Playing, Music, Blockz, Games, Library. It opens the Game Boy list (module 87) straight from
+  the menu, and the temporary "Games" row comes out of the Music menu. New menu icon: RetroArch-esque, a
+  chunky pixel space-invader creature, white on the card. It must be our own drawing, not a copy of
+  RetroArch's logo. Show the owner 2 or 3 icon options as a mockup before building. Touches `menu_carousel`
+  (an extra item), the Music menu patch (the row comes out) and `art/pocket.py` (the icon).
 - v0.2 Now Playing (owner, 2026-11-07): v0.1 left stock's run-time text (font and positions) on
   Now Playing, so it doesn't match the mockup. Replace module 27 with our own window drawn like the
   mockup ("AP30 Screen Mockups", Now Playing): status bar, art panel, artist and album in
