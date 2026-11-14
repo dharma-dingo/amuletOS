@@ -334,6 +334,7 @@ been on an August build).
    flash.
 
 ### 6.4 After that
+- **Road to 1.0** (owner, 2026-11-14): Notion "amuletOS: Build Plan to 1.0" (sister of "Community Gripes vs Releases"): v0.4 Speed (timing log first), v0.5 Library + gapless spike (alpha testers start), v0.6 Conveniences + gapless, v0.7 Beta (8-hour soaks), 1.0 public patcher. Games continue in parallel; gapless is required for 1.0.
 - **Next build: Games on the main menu** (owner, 2026-11-14). Games gets its own carousel item right after
   Blockz: Now Playing, Music, Blockz, Games, Library. It opens the Game Boy list (module 87) straight from
   the menu, and the temporary "Games" row comes out of the Music menu. New menu icon: RetroArch-esque, a
