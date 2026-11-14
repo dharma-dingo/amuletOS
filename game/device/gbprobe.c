@@ -89,6 +89,7 @@ typedef struct {                     /* everything big, at U_BASE */
     uint32_t clus[512];              /* clusters of a fragmented ROM (2 MB in 4 KB clusters at most) */
     uint8_t sec[512];
     int16_t snd[AUDIO_SAMPLES_TOTAL];  /* one frame of sound before conversion (build 50) */
+    struct { uint8_t w, g[32]; } font[64];   /* glyphs 0x20..0x5F of stock font 2 (build 51: stats) */
 } big_t;
 #define B ((big_t *)U_BASE)
 
@@ -246,7 +247,8 @@ static void push_async(void)
  * Traced from the music engine (module 33: MusicInit 0x0308DDD0, Audio Start 0x0308C8EE) and USB audio (module 11
  * 0x03082F4E). Output = DMA channel 5 (reserved for audio; the allocator hands out 0..4) from RAM to the I2S1 FIFO
  * 0x40030024 with stock's settings block 0x03005764 (module 0 initialised data), one 32-bit word per sample, left
- * then right, 24-bit right-justified (stock's converter 0x030660E6: s16 << 16 >> 8), I2S set to 24-bit (0x17).
+ * then right, MSB-aligned: s16 << 16 (build 51; 50 sent s16 << 8, as stock's refill converter 0x030660E6 does, and
+ * the owner heard almost nothing: 48 dB down. Stock's first-buffer converter 0x0306606E gives s16 << 16).
  * The music player is stopped first (it owns the same channel).
  * Build 50: a ring of NCH chunks of CHF frames in the music engine's code window (0x0308BF84.., m33 + the start of
  * m34; idle once the player is stopped; reloaded from flash on close). Each chunk's DMA completion starts the next
@@ -296,8 +298,8 @@ static void tone_fill(int32_t *b)
         int32_t t = (int32_t)(p >> 16);                   /* 0..65535 */
         int32_t v = t < 32768 ? t - 16384 : 49152 - t;    /* -16384..16384 */
         v = v / 8;                                        /* +-2048 of 32767: -24 dB */
-        b[2 * i]     = SN.side == 0 ? v << 8 : 0;
-        b[2 * i + 1] = SN.side == 1 ? v << 8 : 0;
+        b[2 * i]     = SN.side == 0 ? v << 16 : 0;
+        b[2 * i + 1] = SN.side == 1 ? v << 16 : 0;
     }
 }
 
@@ -382,8 +384,8 @@ static void snd_produce(int16_t *tmp)
     uint32_t p = snd_p;
     for (uint32_t i = 0; i < AUDIO_SAMPLES; i++) {
         int32_t *w = SND_RING + ((p + i) & (RINGF - 1u)) * 2u;
-        w[0] = (int32_t)tmp[2 * i] << 8;
-        w[1] = (int32_t)tmp[2 * i + 1] << 8;
+        w[0] = (int32_t)tmp[2 * i] << 16;
+        w[1] = (int32_t)tmp[2 * i + 1] << 16;
     }
     snd_p = p + AUDIO_SAMPLES;
 }
@@ -394,6 +396,72 @@ static void snd_service(void)                            /* tone test */
     uint32_t el = now_us() - SN.t0;
     if (el >= 2000000) { snd_close(); redraw(); return; }
     if (el >= 1000000 && !SN.side) { SN.side = 1; redraw(); }
+}
+
+/* Build 51: stats drawn straight into the framebuffer from a glyph cache and pushed with a 42-row background DMA
+ * (owner on 50: STAT 62.5 ms: stock FillRect runs per glyph row, font reads from flash and the full stock flush,
+ * once a second; the sound queue holds 16 ms, so every redraw made 6..25 chunks late). */
+static void font_cache(void)
+{
+    SetFont(2);
+    uint32_t base = FONTBASE;
+    for (int i = 0; i < 64; i++) {
+        uint32_t c = 0x20u + (uint32_t)i;
+        B->font[i].w = (uint8_t)((int)CharW(c) + SPACING);
+        FontRead(base + c * 33u, B->font[i].g, 32);
+    }
+}
+
+static uint16_t *fb_row(int y) { return (uint16_t *)(0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y * 592u); }
+
+static void fb_fill(int y0, int y1, uint16_t col)        /* full-width rows, y < 190 */
+{
+    for (int y = y0; y <= y1; y++) { uint16_t *r = fb_row(y); for (int x = 0; x < 296; x++) r[x] = col; }
+}
+
+static int fb_text(int x, int y, const uint16_t *s, uint16_t fg, uint16_t bg)
+{
+    for (; *s; s++) {
+        uint32_t c = *s;
+        if (c >= 'a' && c <= 'z') c -= 32;
+        if (c < 0x20 || c > 0x5F) c = '?';
+        int w = B->font[c - 0x20].w;
+        if (w > 16) w = 16;
+        if (x + w > 295) break;
+        const uint8_t *g = B->font[c - 0x20].g;
+        for (int r = 0; r < 16; r++) {
+            uint32_t v = (uint32_t)g[2 * r] << 8 | g[2 * r + 1];
+            uint16_t *row = fb_row(y + r);
+            for (int k = 0; k < w; k++) {
+                int col = FB_ROT ? 295 - (x + k) : x + k;
+                row[col ^ 1] = (v & (0x8000u >> k)) ? fg : bg;
+            }
+        }
+        x += w;
+    }
+    return x;
+}
+
+static void fb_say(int x, int y, const char *f, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4)
+{
+    uint32_t a[5] = { a0, a1, a2, a3, a4 };
+    uint16_t b[64];
+    fmt(b, f, a);
+    fb_text(x, y, b, C_INK, C_SCREEN);
+}
+
+static void push_rows(int y0, int y1)                    /* as push_async, any full-width rows below 190 */
+{
+    static uint32_t cfg[4];
+    push_wait();
+    const volatile uint32_t *c = (const volatile uint32_t *)0x0306E96Cu;
+    for (int i = 0; i < 4; i++) cfg[i] = c[i];
+    LCD_DONE = 0;
+    LcdWindow(0, y0, 0x127, y1);
+    VopCmd(0, 6);
+    uint32_t ch = DmaGet() & 0xFF;
+    DmaStart(ch, (uint32_t)fb_row(y0), 0x6007002Cu, 0x128u * (uint32_t)(y1 - y0 + 1) / 2u, cfg, 0x03080EADu);
+    S.dma_busy = 1;
 }
 
 static void mark_dirty(void)
@@ -524,6 +592,7 @@ static void start(const rom_t *r)
     S.gpio_idle = gpio_key();
     S.adc_state = S.adc_cand = 8;
     S.state = ST_RUN;
+    font_cache();
     frame_box();
     snd_open(0);                                                  /* build 50: game sound (stops the music) */
     S.next = S.stat_t0 = now_us();
@@ -534,17 +603,13 @@ static void start(const rom_t *r)
 static void stats(uint32_t now)
 {
     uint32_t span = now - S.stat_t0, f = S.frames ? S.frames : 1;
-    char title[17]; gb_get_rom_name(&B->g.gb, title);
-    fill(0, 0, 295, GB_Y - 3, C_SCREEN);
-    fill(0, GB_Y + LCD_HEIGHT + 2, 295, 239, C_SCREEN);
-    say(4, 4, C_INK, "%s  FPS %1", (uint32_t)title, span ? S.frames * 10000000u / span : 0, 0, 0, 0);
-    say(4, 24, C_INK, "EMU %1 DRAW %1 SND %1 LATE %d", S.emu_us / f / 100, S.draw_us / f / 100,
-        S.snd_us / f / 100, snd_under - S.under0, 0);           /* build 50: LATE = sound chunks not ready */
-    say(4, 198, C_INK, "PAGES %d LOADS %d %1MS STAT %1MS", B->g.nslots, B->g.misses - S.loads0, S.load_us / 100,
-        S.stat_us / 100, 0);                                    /* STAT: the last stats redraw itself */
-    uint8_t pad = (uint8_t)~B->g.gb.direct.joypad;
-    say(4, 218, C_DIM, "ADC %d G%d KEYS %x CLK %d", ADC_CH1, gpio_key(), pad,
-        *(volatile uint32_t *)0x030065D8u / 1000000u, 0);
+    push_wait();
+    fb_fill(0, GB_Y - 3, C_SCREEN);
+    fb_say(4, 4, "FPS %1 LATE %d LOADS %d VOL %d", span ? S.frames * 10000000u / span : 0, snd_under - S.under0,
+           B->g.misses - S.loads0, S8(0x12), 0);
+    fb_say(4, 23, "EMU %1 DRAW %1 SND %1 STAT %1", S.emu_us / f / 100, S.draw_us / f / 100, S.snd_us / f / 100,
+           S.stat_us / 100, 0);
+    push_rows(0, GB_Y - 3);
     S.stat_t0 = now_us();
     S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = S.wait_us = S.snd_us = 0;
     S.loads0 = B->g.misses; S.under0 = snd_under;
@@ -579,7 +644,7 @@ static void run(void)
     if (B->g.err) { snd_close(); S.err = 200 + (uint32_t)B->g.err; S.state = ST_ERR; redraw(); return; }
     S.next += FRAME_US;
     if ((int32_t)(t2 - S.next) > (int32_t)(3 * FRAME_US)) { S.next = t2; S.late++; }
-    if (t2 - S.stat_t0 >= 1000000) { push_wait(); uint32_t s0 = now_us(); stats(t2); Flush(); S.stat_us = now_us() - s0; }
+    if (t2 - S.stat_t0 >= 1000000) { uint32_t s0 = now_us(); stats(t2); S.stat_us = now_us() - s0; }
 }
 
 static void core_b_test(void)
@@ -681,13 +746,29 @@ static void bench(void)
     redraw();
 }
 
+/* Build 51: the wheel changes the volume in games (owner on 50: it did nothing). Stock's SetVolume writes the codec;
+ * it switches the amp off at 0 and on again only while the player runs, so the amp is ours. */
+static void wheel(int d)
+{
+    int v = S8(0x12) + d;
+    if (v < 0) v = 0;
+    if (v > 100) v = 100;
+    S8(0x12) = (uint8_t)v;
+    SetVolume((uint32_t)v);
+    if (SN.on && v) { IoMux(2, 1, 0); GpioDir(2, 1, 1); GpioSet(2, 1, 0); }
+}
+
 static int32_t service(void)
 {
     if (S.state == ST_QUIT) return -1;
     if (S.state == ST_BENCH && S.bstep < BENCH_STEPS && !S.dirty) bench_step();
     if (S.state == ST_SOUND) snd_service();
     if (S.state == ST_RUN) {
-        for (int n = 0; n < 8; n++) { uint32_t ev = GetKey(); if (!ev) break; S.last_ev = ev; }
+        for (int n = 0; n < 8; n++) {
+            uint32_t ev = GetKey(); if (!ev) break; S.last_ev = ev;
+            uint32_t k = ev & 0x7FF, t = ev >> 24;
+            if ((t == 0x40 || t == 0x30) && (k == 0x400 || k == 0x200)) wheel(k == 0x400 ? 1 : -1);
+        }
         run();
         return S.state == ST_QUIT ? -1 : 0;
     }

@@ -487,7 +487,8 @@ and USB audio (module 11: 0x03082F4E). All helpers are resident (module 0).
 - **Amp:** GPIO2 pin 1, low = on, high = off.
 - **Per track (Audio Start):** CRU (4, 1), CodecRate(rate), SetVolume(sys+0x12), wait for channel 5 idle, I2S init
   (rate, 0x17), DmaStart(5, buffer, 0x40030024, words, 0x03005764, 0x0306602D), watchdog, 80 ms, TX start.
-- **Data:** one 32-bit word per sample, left then right, signed 24-bit right-justified (s16 << 8). DMA count in words.
+- **Data:** one 32-bit word per sample, left then right, **MSB-aligned (s16 << 16)**: build 50 sent s16 << 8 (as
+  stock's refill converter 0x030660E6 produces) and it was ~48 dB too quiet. DMA count in words.
   Settings block 0x03005764 is module 0 initialised data (valid from boot).
 - DMA channel 5 is the audio channel (stock's allocator 0x030614F8 hands out 0..4).
 - **DAC power-up is needed even when the flag says on** (builds 48 / 49): with no music since boot the flag was 1,
