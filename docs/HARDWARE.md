@@ -456,7 +456,16 @@ out text wider than its current advances (clipping or scrolling).
   Chinese Chess). Untouched in amuletOS (byte-identical to stock): tasks 14, 16, 17, 18, 34..42. Reused: 15 Blockz,
   19 Playlists, 20..32 the Games screen span, 33 the extension donor. Every game quits with TaskSwitch(10, &7) (the
   stock game list, Settings page 7); build 55 patches the untouched ones to TaskSwitch(20) (`games_back`). The stock
-  list itself (Settings > Game) still lists all 29, including the reused ones.
+  list itself (Settings > Game) lists all 29, including the reused ones; build 56 (`settings_game`) makes the
+  Game item open task 20 instead.
+- **Settings menu (module 32, traced 2026-11-14, build 56):** menu nodes are text ids; the key handler's enter step
+  (0x0308247C) takes the selected child id from the current level (+5 selection, +8 node, ids at node +0x10) and calls
+  0x03081C8E(id), which pushes a level for a submenu (Game = 0x110) or runs the leaf action 0x030836FC(id): a switch
+  on id - 0x7f over 32-bit offsets from 0x03083770. Game leaves 0x111..0x12d launch: 0x111 -> 15, 0x112 -> 14,
+  0x113..0x116 -> 16..19, 0x117 -> 22, 0x118 -> 21, 0x119 -> 20, 0x11a..0x120 -> 23..29, 0x121 -> 31, 0x122 -> 32,
+  0x123..0x127 -> 34..38, 0x128 -> 30, 0x129..0x12b -> 39..41, 0x12c -> 43, 0x12d -> 42 (no item launches 33).
+  This does not match the in-order name list above (e.g. 0x111 Retro Block Puzzle -> task 15, 0x112 Snake -> 14,
+  0x128 Chinese Checkers -> 30); not yet checked which is right.
 - **Owner's /f/roms/gb:** Tetris (World) (Rev 1), Kirby's Dream Land 2, Final Fantasy Adventure (USA) and My
   Friendly Little Island Deluxe are colourised hacks with header 0x143 = 0xC0 (Game Boy Color only); original
   Game Boy games there: Super Mario Land, Catrap, Pipe Dream, QIX, Burger Time Deluxe, Picross 2, Embers of Mana,

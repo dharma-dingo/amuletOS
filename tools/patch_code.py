@@ -256,7 +256,31 @@ def playlists():
          (thumb_bw(0x0308DFB8, h["pl_init_seek"]) + bytes.fromhex("00bf") * 4).hex()),
     ]
 
-GENERATED = {"playlists": playlists, "menu_carousel": menu_carousel, "music_update": music_update, "np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
+def settings_game():
+    """Settings > Game opens the Games screen (build 56, hooks/settings_game.S). Stock: the item (text 0x110) opens
+    the stock game list (texts 0x111..0x12d), which also lists the games on reused tasks: 15 Blockz, 19 Playlists,
+    20..32 the Games screen span (a launch there jumps into the middle of gbprobe.c). The key handler's enter step
+    (m32 0x0308247C: child text id, bl 0x03081C8E) goes to the stub, which TaskSwitch(20)es for 0x110. The stub
+    sits in the launch cases for tasks 21..31; the menu cases (32-bit offsets from 0x03083770, index id - 0x7f) of
+    every task 21..32 game now point at the task-20 case (0x03083C0A, TaskSwitch(0x14)), in case the list is ever
+    reached another way (Settings page 7)."""
+    T, AT, END, GAMES = 0x03083770, 0x03083C1C, 0x03083CE0, 0x03083C0A
+    code, sym = assemble("settings_game", AT)
+    assert AT + len(code) <= END, f"stub is {len(code)} B, room for {END - AT}"
+    cases = {0x118: 0x03083C1C, 0x117: 0x03083C2E, 0x11A: 0x03083C40, 0x11B: 0x03083C52, 0x11C: 0x03083C64,
+             0x11D: 0x03083C76, 0x11E: 0x03083C88, 0x11F: 0x03083C9A, 0x120: 0x03083CAC, 0x128: 0x03083CBE,
+             0x121: 0x03083CD0, 0x122: 0x03083CE0}                        # text id -> launch case (tasks 21..32)
+    stock = ("9248002104701520e4f756fa012500f06bb98e48002104701620e4f74dfa012500f062b9"   # tasks 21, 22
+             "8948002104701720e4f744fa012500f059b98548002104701820e4f73bfa012500f050b9")  # tasks 23, 24
+    assert len(code) <= len(stock) // 2
+    off = lambda a: struct.pack("<i", a - T).hex()
+    return [(32, T + (i - 0x7F) * 4, off(a), off(GAMES)) for i, a in cases.items()] + [
+        (32, AT, stock[:2 * len(code)], code.hex()),                        # launch cases for tasks 21..
+        (32, 0x0308247C, "6179a068102202eb4101405afff701fc",               # ldrb; ldr; movs; add.w; ldrh; bl enter
+         (thumb_bw(0x0308247C, sym["settings_enter"]) + bytes.fromhex("00bf") * 6).hex()),
+    ]
+
+GENERATED = {"settings_game": settings_game, "playlists": playlists, "menu_carousel": menu_carousel, "music_update": music_update, "np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)
