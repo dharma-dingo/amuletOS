@@ -42,9 +42,7 @@ int main(int argc, char **argv)
     int r = gbx_init(&X, (uint32_t)ROMLEN, pages, (uint32_t)slots);
     if (r) { printf("FAIL init error %d\n", r - 1); return 1; }
     for (int i = 0; i < 4; i++) X.pal[i] = (uint16_t)i;        /* as the device: shades out, colours later */
-    static uint8_t cram[0x8000];
-    X.cram_len = gbx_save_size(&X); if (X.cram_len > sizeof cram) X.cram_len = sizeof cram;
-    X.cram = cram; memset(cram, 0xFF, sizeof cram);
+    X.cram_len = gbx_save_size(&X); if (X.cram_len > GBX_CRAM_MAX) X.cram_len = 0;   /* pages on first write */
     char title[17]; gb_get_rom_name(&X.gb, title);
     uint32_t peak = 0, last = 0;
     /* sound: whole run to OUT.wav (48 kHz stereo 16-bit), peak level, APU time per frame */
@@ -77,8 +75,8 @@ int main(int argc, char **argv)
     uint32_t sum = 0;
     for (int y = 0; y < LCD_HEIGHT; y++) for (int x = 0; x < LCD_WIDTH; x++) sum = sum * 31 + GREY[FB[y][x]];
     printf("%s: %ld KB, cart RAM %u B, %d frames, %d slots: %u page loads (%.2f / s of game time, worst second %u), "
-           "frame sum %08x\n", title, ROMLEN / 1024, (unsigned)X.cram_len, frames, slots, (unsigned)loads,
-           loads * 59.73 / frames, (unsigned)peak, (unsigned)sum);
+           "frame sum %08x, cart RAM pages written %u\n", title, ROMLEN / 1024, (unsigned)X.cram_len, frames, slots,
+           (unsigned)loads, loads * 59.73 / frames, (unsigned)peak, (unsigned)sum, (unsigned)X.cram_pages);
     FILE *o = fopen(argv[4], "wb");
     fprintf(o, "P6 %d %d 255\n", LCD_WIDTH, LCD_HEIGHT);
     for (int y = 0; y < LCD_HEIGHT; y++) for (int x = 0; x < LCD_WIDTH; x++) {

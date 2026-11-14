@@ -535,18 +535,8 @@ static void start(const rom_t *r)
     if (e) { S.err = (uint32_t)e; S.state = ST_ERR; redraw(); return; }
     for (int i = 0; i < 4; i++) B->g.pal[i] = (uint16_t)i;       /* build 53: shades out, gb_scale.h colours them */
     gbs_init(&B->scale, FB_ROT != 0, 1);
-    uint32_t cram = gbx_save_size(&B->g);
-    if (cram > 0x8000) cram = 0;                                  /* bigger cartridge RAM: not in the probe */
-    uint32_t give = (cram + PG_SIZE - 1) >> PG_SHIFT;             /* cartridge RAM takes the last pages */
-    if (give) {
-        if (give + 8 > B->g.nslots) { S.err = 102; S.state = ST_ERR; redraw(); return; }
-        for (uint32_t i = B->g.nslots - give; i < B->g.nslots; i++)
-            if (B->g.owner[i] != 0xFFFF) { S.err = 103; S.state = ST_ERR; redraw(); return; }
-        B->g.nslots -= give;
-        B->g.cram = B->g.slot[B->g.nslots];                       /* contiguous: the U pages ascend */
-        B->g.cram_len = cram;
-        for (uint32_t i = 0; i < cram; i++) B->g.cram[i] = 0xFF;
-    }
+    uint32_t cram = gbx_save_size(&B->g);                         /* build 54: pages taken on first write */
+    B->g.cram_len = cram > GBX_CRAM_MAX ? 0 : cram;
     S.gpio_idle = gpio_key();
     S.adc_state = S.adc_cand = 8;
     S.state = ST_RUN;

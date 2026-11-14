@@ -13,12 +13,12 @@
 #define TEXT_DY  0x42                                     /* stock: text y = 0x42 + 23 * row; row top = 0x3D + 23 * row */
 #define SHIFT    26
 
-extern const uint16_t music_menu[];                       /* m22_ext.S: {icon, text id, action} x 9 */
+extern const uint16_t music_menu[];                       /* m22_ext.S: {icon, text id, action} x 8 */
 
 void m22_row_text(int x, int y, int w, int h, int z, int id)
 {
     uint32_t icon = 0;
-    for (int i = 0; i < 9; i++)
+    for (int i = 0; i < 8; i++)
         if (music_menu[3 * i + 1] == (uint16_t)id) { icon = music_menu[3 * i]; break; }
     int row = (y - TEXT_DY) / 23;
     if (icon) DrawImage(icon + (row == SEL_ROW ? 10 : 0), 8, y - (TEXT_DY - 0x3D) - 1);

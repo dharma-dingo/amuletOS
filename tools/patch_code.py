@@ -189,23 +189,26 @@ def np_v4():
     ]
 
 def menu_carousel():
-    """v0.3 one-level main menu (module 21): items 0 Now Playing, 1 Music, 2 Blockz, 3 Library (art/menu_panels.py);
-    Left/Right wrap over four, Up/Down do nothing, Start opens Settings (Setup page), position kept in RAM by the
-    slot-2 stubs (np_stub.S). Use with menu_games_to_blockz (item 2 runs the old Games action, task 15)."""
+    """v0.3 one-level main menu (module 21): items 0 Now Playing, 1 Music, 2 Blockz, 3 Games, 4 Library
+    (art/pocket.py; Games added in build 54: stock's dead tile code 0x03081996 calls m21_ext.c menu_games, task 20);
+    Left/Right wrap over five, Up/Down do nothing, Start opens Settings (Setup page), position kept in RAM by
+    m21_ext.S. Use with menu_games_to_blockz (item 2 runs the old Games action, task 15)."""
     h = syms()
     T = 0x030818B4                                   # tbb table of the tile action routine 0x0308188E
     tb = lambda a: (a - T) // 2
     np_handler = (thumb_bl(0x030819D0, h["menu_np"])                  # Now Playing if the player runs; return 1
                   + bytes.fromhex("07b00120bde8f08300bf00bf00bf00bf"))
     return [
-        (21, T, "035661718e84", bytes([tb(0x030819D0), tb(0x030818BA), tb(0x03081960), tb(0x03081976),
-                                      tb(0x03081996), tb(0x030819BC)]).hex()),
+        (21, T, "035661718e84", bytes([tb(0x030819D0), tb(0x030818BA), tb(0x03081960), tb(0x03081996),
+                                      tb(0x03081976), tb(0x030819BC)]).hex()),
         (21, 0x030819D0, "adf8001069460a20e6f77cfb07b00120bde8f083", np_handler.hex()),  # old item 4 -> Now Playing
-        (21, 0x03081CF8, "b8f80000032808d2401c80b2a8f80000",                             # Right: +1 of 4
+        (21, 0x03081996, "6948017005208df80000adf8",                                     # old item 3 -> Games
+         (thumb_bl(0x03081996, h["menu_games"]) + bytes.fromhex("07b00120bde8f083")).hex()),
+        (21, 0x03081CF8, "b8f80000032808d2401c80b2a8f80000",                             # Right: +1 of 5
          (bytes.fromhex("0120") + thumb_bl(0x03081CFA, h["menu_step"]) + thumb_b16(0x03081CFE, 0x03081CD6)
           + bytes.fromhex("00bf") * 4).hex()),
-        (21, 0x03081D24, "b8f80000032888bf401e08bf0520dad2002800e0",                     # Left: -1 of 4
-         (bytes.fromhex("0320") + thumb_bl(0x03081D26, h["menu_step"]) + thumb_b16(0x03081D2A, 0x03081CD6)
+        (21, 0x03081D24, "b8f80000032888bf401e08bf0520dad2002800e0",                     # Left: +4 of 5
+         (bytes.fromhex("0420") + thumb_bl(0x03081D26, h["menu_step"]) + thumb_b16(0x03081D2A, 0x03081CD6)
           + bytes.fromhex("00bf") * 6).hex()),
         (21, 0x03081CDE, "b8f8", thumb_b16(0x03081CDE, 0x03081D74).hex()),               # Up/Down: nothing
         (21, 0x03081BA6, "4ff4bd70e6f793f9e849d9f80000d6f762f8",                         # Start: Settings page 4
@@ -222,7 +225,7 @@ def music_update():
     t = struct.pack("<I", h["music_menu"]).hex()
     return [
         (22, 0x03081B28, "483b0203", t), (22, 0x03081F6C, "483b0203", t), (22, 0x03082174, "483b0203", t),
-        (22, 0x0308165A, "072604462e70", "092604462e70"),          # 9 items (build 41: + Games)
+        (22, 0x0308165A, "072604462e70", "082604462e70"),          # 8 items (41..53: 9 with Games)
         (22, 0x030816EC, "0728ccbf2e712871", "0728c8bf07202871"),  # still 7 rows per page
         (22, 0x030818D8, "a7f84290", thumb_bl(0x030818D8, h["lib_force"]).hex()),
     ]

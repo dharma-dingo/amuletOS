@@ -123,6 +123,14 @@ def _blockz():
     return ["".join(r) for r in g]
 BLOCKZ = _blockz()
 
+# Games (build 54, owner's pick B of three): a white creature with raised arms on an ink tile, RetroArch in spirit,
+# our own drawing
+GAMES = [
+    "................", ".kkkkkkkkkkkkkk.", ".kwkkwkkkkwkkwk.", ".kwkkkwkkwkkkwk.",
+    ".kwkkwwwwwwkkwk.", ".kwwwwwwwwwwwwk.", ".kkwkkwwwwkkwkk.", ".kkwkkwwwwkkwkk.",
+    ".kkwwwwwwwwwwkk.", ".kkkwwwwwwwwkkk.", ".kkkwwkkkkwwkkk.", ".kkwwkkkkkkwwkk.",
+    ".kwwkkkkkkkkwwk.", ".kkkkkkkkkkkkkk.", ".kkkkkkkkkkkkkk.", "................"]
+
 def grey(c):
     r, g, b = rgb(c)
     v = round(0.3 * r + 0.59 * g + 0.11 * b)
@@ -136,9 +144,12 @@ def icon(cv, rows, x, y, k=1, fade=0.0, off=False):
                 col = grey(PAL[ch]) if off else PAL[ch]
                 cv.rect(x + c * k, y + r * k, k, k, mix(col, WHITE, fade) if fade else col)
 
-# ---------- main menu carousel (stock index -> image 016, 014, 018, 022) ----------
-ITEMS = [("Now Playing", NOW_PLAYING, GRAPE), ("Music", MUSIC, SKY), ("Blockz", BLOCKZ, GOLD), ("Library", LIBRARY, BERRY)]
-STATES = [16, 14, 18, 22]
+# ---------- main menu carousel (menu position -> image 016, 014, 018, 020, 022) ----------
+# Build 54: Games after Blockz (owner). There is no spare full-screen image, so Games takes 020 (was the Music card
+# with a greyed Now Playing side icon; the Music card now always shows it in colour).
+ITEMS = [("Now Playing", NOW_PLAYING, GRAPE), ("Music", MUSIC, SKY), ("Blockz", BLOCKZ, GOLD), ("Games", GAMES, TEAL),
+         ("Library", LIBRARY, BERRY)]
+STATES = [16, 14, 18, 20, 22]
 
 def chevron(cv, x, y, left):
     for r, w in enumerate((1, 2, 3, 3, 2, 1)):
@@ -147,7 +158,7 @@ def chevron(cv, x, y, left):
             cv.rect(x + cx * 2, y + r * 2, 2, 2, INK)
 
 OFF_INK, OFF_ACCENT = "#a9adb8", "#c9ccd6"
-GREY_STATES = {0: 8, 1: 20, 3: 24}   # Now Playing greyed (nothing loaded): stock's unused grid image 8, tiles 4/5
+GREY_STATES = {0: 8, 4: 24}   # Now Playing greyed (nothing loaded): stock's unused grid image 8, old tile 5
 
 def menu_card(sel, np_off=False):
     """np_off: the Now Playing item is greyed out (player not running; np_helpers.c menu_art picks these)"""
@@ -157,16 +168,18 @@ def menu_card(sel, np_off=False):
     cv = Canvas(W, H)
     screen(cv, 34)
     status(cv)
-    for d, x in ((-1, 22), (1, W - 22 - 32)):
+    # build 54 (owner: menu sat high, room below): card 136 (was 104), icon 7x (was 5x), dots 8 px near the bottom
+    CX, CY, CS = (W - 136) // 2, 42, 136
+    for d, x in ((-1, 20), (1, W - 20 - 32)):
         j = (sel + d) % n
-        icon(cv, ITEMS[j][1], x, 70, 2, fade=0.72 if np_off and j == 0 else 0.58, off=np_off and j == 0)
-    chevron(cv, 76, 80, True); chevron(cv, W - 76 - 6, 80, False)
-    frame(cv, 96, 36, 104, 104, WHITE, OFF_ACCENT if off else accent)
-    icon(cv, ic, 96 + 12, 36 + 12, 5, fade=0.45 if off else 0.0, off=off)
-    text_c(cv, title, 152, OFF_INK if off else INK, 2)
-    x0 = (W - (n * 6 + (n - 1) * 6)) // 2
+        icon(cv, ITEMS[j][1], x, CY + CS // 2 - 16, 2, fade=0.72 if np_off and j == 0 else 0.58, off=np_off and j == 0)
+    chevron(cv, 62, CY + CS // 2 - 6, True); chevron(cv, W - 62 - 6, CY + CS // 2 - 6, False)
+    frame(cv, CX, CY, CS, CS, WHITE, OFF_ACCENT if off else accent)
+    icon(cv, ic, CX + 12, CY + 12, 7, fade=0.45 if off else 0.0, off=off)
+    text_c(cv, title, 188, OFF_INK if off else INK, 2)
+    x0 = (W - (n * 8 + (n - 1) * 8)) // 2
     for k in range(n):
-        cv.rect(x0 + k * 12, 196, 6, 6, (OFF_INK if off else accent) if k == sel else "#c9ccd6")
+        cv.rect(x0 + k * 16, 226, 8, 8, (OFF_INK if off else accent) if k == sel else "#c9ccd6")
     return cv
 
 # ---------- Now Playing (026) and its cover placeholder (277) ----------

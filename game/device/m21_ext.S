@@ -20,15 +20,17 @@ menu_idx_init:
     lsrs    r2, r1, #8
     ldr     r3, =(MENU_TAG >> 8)
     cmp     r2, r3
-    ite     eq
-    andeq   r1, r1, #3
-    movne   r1, #1                  @ fresh boot: Music (owner, build 33)
-    strh    r1, [r0]
+    bne     1f
+    uxtb    r1, r1
+    cmp     r1, #5                  @ five items (build 54)
+    blo     2f
+1:  movs    r1, #1                  @ fresh boot: Music (owner, build 33)
+2:  strh    r1, [r0]
     bl      menu_art                @ grey Now Playing unless the player runs
     pop     {r0, pc}
     .ltorg
 
-@ Left / Right: r0 = 3 (back) or 1 (on); four items, wrapping
+@ Left / Right: r0 = 4 (back) or 1 (on); five items, wrapping (build 54: + Games)
     .section .text.menu_step
     .global menu_step
     .thumb_func
@@ -36,7 +38,9 @@ menu_step:
     ldr     r2, =MENU_IDX
     ldrh    r1, [r2]
     add     r1, r0
-    and     r1, r1, #3
+    cmp     r1, #5
+    it      hs
+    subhs   r1, #5
     strh    r1, [r2]
     ldr     r2, =MENU_RAM
     ldr     r3, =MENU_TAG

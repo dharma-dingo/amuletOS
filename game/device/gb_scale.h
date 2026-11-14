@@ -1,5 +1,6 @@
-/* Full-height Game Boy picture with a DMG look (build 53, owner's choice from PC mockups): 160 x 144 scaled to
- * 266 x 240 (5/3 vertically, 266/160 horizontally, nearest neighbour), centred on the 296 x 240 screen, in a soft
+/* Full-screen Game Boy picture with a DMG look (build 53, owner's choice from PC mockups; build 54: stretched to
+ * the full width, owner): 160 x 144 scaled to 296 x 240 (5/3 vertically, 296/160 horizontally, nearest
+ * neighbour; 53 kept the shape at 266 x 240, centred), in a soft
  * DMG olive palette with a faint pixel grid. Game Boy pixels come out 1 or 2 screen pixels wide and tall; on the
  * 2-wide (2-tall) ones the second column (row) is drawn 35% toward the lightest shade, which reads as the gaps
  * between LCD pixels. Shared by the device (gbprobe.c) and the PC test (game/test/test_gb.c). */
@@ -7,9 +8,9 @@
 #define GB_SCALE_H
 #include <stdint.h>
 
-#define GBS_W 266
+#define GBS_W 296                         /* build 53: 266 */
 #define GBS_H 240
-#define GBS_X 15                          /* (296 - 266) / 2 */
+#define GBS_X 0                           /* build 53: 15 */
 #define GBS_NONE 0xFFFFu
 
 typedef struct {
