@@ -52,13 +52,14 @@ int main(int argc, char **argv)
     uint32_t hdr[11] = { 0x46464952, 36 + wbytes, 0x45564157, 0x20746d66, 16, 0x00020001, 48000, 48000 * 4, 0x00100004,
                          0x61746164, wbytes };
     fwrite(hdr, 4, 11, w);
-    int speak = 0; double sq = 0; long nz = 0; clock_t apu = 0;
+    int speak = 0; double sq = 0; long nz = 0; clock_t apu = 0, emu = 0;
+    X.gb.direct.frame_skip = getenv("GBX_SKIP") != NULL;   /* frame skip: Peanut draws every other frame */
     for (int n = 0; n < frames; n++) {
         /* tap Start for 6 frames every 4 s (title screens), A for 6 frames every 3 s */
         X.gb.direct.joypad = 0xFF;
         if (n % 240 >= 200 && n % 240 < 206) X.gb.direct.joypad &= ~JOYPAD_START;
         if (n % 180 >= 90 && n % 180 < 96) X.gb.direct.joypad &= ~JOYPAD_A;
-        gb_run_frame(&X.gb);
+        { clock_t e0 = clock(); gb_run_frame(&X.gb); emu += clock() - e0; }
         clock_t c0 = clock(); gbx_audio(&X, snd); apu += clock() - c0;
         for (unsigned i = 0; i < AUDIO_SAMPLES_TOTAL; i++) { int v = snd[i] < 0 ? -snd[i] : snd[i]; if (v > speak) speak = v; sq += (double)snd[i] * snd[i]; nz += snd[i] != 0; }
         fwrite(snd, 2, AUDIO_SAMPLES_TOTAL, w);
@@ -66,6 +67,7 @@ int main(int argc, char **argv)
         if (n % 60 == 59) { if (loads - last > peak) peak = loads - last; last = loads; }
     }
     fclose(w);
+    printf("emulation %.3f ms a frame (PC)%s\n", 1000.0 * emu / CLOCKS_PER_SEC / frames, X.gb.direct.frame_skip ? ", frame skip" : "");
     printf("sound: %u samples a frame, peak %d, rms %.0f, non-zero %.1f%%, APU %.3f ms a frame (PC), %s\n",
            AUDIO_SAMPLES, speak, sqrt(sq / ((double)frames * AUDIO_SAMPLES_TOTAL)), 100.0 * nz / ((double)frames * AUDIO_SAMPLES_TOTAL),
            1000.0 * apu / CLOCKS_PER_SEC / frames, wname);

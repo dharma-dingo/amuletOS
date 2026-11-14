@@ -98,7 +98,8 @@ static struct {
     int sel, top;
     uint32_t adc_since, sel_since, next, stat_t0;
     uint32_t frames, emu_us, draw_us, push_us, load_us, loads0, late, line_us, wait_us, snd_us, stat_us, under0;
-    uint8_t dma_busy;
+    uint8_t dma_busy, top_dirty;      /* build 52: stats rows drawn, send them with the next frame */
+    uint32_t skips;
     uint32_t last_ev, err;
     const rom_t *rom;
     uint32_t cb_read, cb_rw;          /* core B test results */
@@ -228,18 +229,19 @@ static void push_wait(void)
     S.dma_busy = 0;
 }
 
-static void push_async(void)
+static void push_async(int y0)                           /* rows y0 (< 190) .. the last Game Boy row */
 {
     static uint32_t cfg[4];
     push_wait();
     const volatile uint32_t *c = (const volatile uint32_t *)0x0306E96Cu;   /* the driver's DMA settings */
     for (int i = 0; i < 4; i++) cfg[i] = c[i];
-    uint32_t src = 0x03006688u + FB_PAGE * 0x1B760u + GB_Y * 592u;
+    uint32_t src = 0x03006688u + FB_PAGE * 0x1B760u + (uint32_t)y0 * 592u;
+    int y1 = GB_Y + LCD_HEIGHT - 1;
     LCD_DONE = 0;
-    LcdWindow(0, GB_Y, 0x127, GB_Y + LCD_HEIGHT - 1);
+    LcdWindow(0, y0, 0x127, y1);
     VopCmd(0, 6);
     uint32_t ch = DmaGet() & 0xFF;
-    DmaStart(ch, src, 0x6007002Cu, 0x128u * LCD_HEIGHT / 2, cfg, 0x03080EADu);
+    DmaStart(ch, src, 0x6007002Cu, 0x128u * (uint32_t)(y1 - y0 + 1) / 2u, cfg, 0x03080EADu);
     S.dma_busy = 1;
 }
 
@@ -280,7 +282,9 @@ static void push_async(void)
 #define CHF         256u                                  /* frames per DMA chunk: 5.3 ms */
 #define NCH         8u
 #define RINGF       (CHF * NCH)                           /* 2048 frames, 16 KB */
-#define SND_MARGIN  768u                                  /* 16 ms queued before a frame is emulated */
+#define SND_MARGIN  960u                                  /* 20 ms queued before a frame is emulated (build 52;
+                                                              51: 768). Ring limit: SND_MARGIN + 803 <= 7 chunks */
+#define SKIP_BELOW  (SND_MARGIN - CHF)                    /* fewer queued at a frame start: behind, skip drawing */
 #define SND_RING    ((int32_t *)0x0308BF84u)              /* .. 0x0308FF84, below the decoders (0x0308FFBC) */
 
 static void redraw(void);
@@ -398,9 +402,10 @@ static void snd_service(void)                            /* tone test */
     if (el >= 1000000 && !SN.side) { SN.side = 1; redraw(); }
 }
 
-/* Build 51: stats drawn straight into the framebuffer from a glyph cache and pushed with a 42-row background DMA
- * (owner on 50: STAT 62.5 ms: stock FillRect runs per glyph row, font reads from flash and the full stock flush,
- * once a second; the sound queue holds 16 ms, so every redraw made 6..25 chunks late). */
+/* Build 51: stats drawn straight into the framebuffer from a glyph cache (owner on 50: STAT 62.5 ms: stock FillRect
+ * runs per glyph row, font reads from flash and the full stock flush, once a second; the sound queue held 16 ms, so
+ * every redraw made 6..25 chunks late). 51 sent the rows with a push of their own and the owner saw no stats; from
+ * build 52 they go out with the next game frame's push, which starts at row 0 on that frame. */
 static void font_cache(void)
 {
     SetFont(2);
@@ -448,20 +453,6 @@ static void fb_say(int x, int y, const char *f, uint32_t a0, uint32_t a1, uint32
     uint16_t b[64];
     fmt(b, f, a);
     fb_text(x, y, b, C_INK, C_SCREEN);
-}
-
-static void push_rows(int y0, int y1)                    /* as push_async, any full-width rows below 190 */
-{
-    static uint32_t cfg[4];
-    push_wait();
-    const volatile uint32_t *c = (const volatile uint32_t *)0x0306E96Cu;
-    for (int i = 0; i < 4; i++) cfg[i] = c[i];
-    LCD_DONE = 0;
-    LcdWindow(0, y0, 0x127, y1);
-    VopCmd(0, 6);
-    uint32_t ch = DmaGet() & 0xFF;
-    DmaStart(ch, (uint32_t)fb_row(y0), 0x6007002Cu, 0x128u * (uint32_t)(y1 - y0 + 1) / 2u, cfg, 0x03080EADu);
-    S.dma_busy = 1;
 }
 
 static void mark_dirty(void)
@@ -605,13 +596,13 @@ static void stats(uint32_t now)
     uint32_t span = now - S.stat_t0, f = S.frames ? S.frames : 1;
     push_wait();
     fb_fill(0, GB_Y - 3, C_SCREEN);
-    fb_say(4, 4, "FPS %1 LATE %d LOADS %d VOL %d", span ? S.frames * 10000000u / span : 0, snd_under - S.under0,
-           B->g.misses - S.loads0, S8(0x12), 0);
+    fb_say(4, 4, "FPS %1 LATE %d SKIP %d LOADS %d", span ? S.frames * 10000000u / span : 0, snd_under - S.under0,
+           S.skips, B->g.misses - S.loads0, 0);
     fb_say(4, 23, "EMU %1 DRAW %1 SND %1 STAT %1", S.emu_us / f / 100, S.draw_us / f / 100, S.snd_us / f / 100,
            S.stat_us / 100, 0);
-    push_rows(0, GB_Y - 3);
+    S.top_dirty = 1;
     S.stat_t0 = now_us();
-    S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = S.wait_us = S.snd_us = 0;
+    S.frames = S.emu_us = S.draw_us = S.push_us = S.load_us = S.wait_us = S.snd_us = S.skips = 0;
     S.loads0 = B->g.misses; S.under0 = snd_under;
 }
 
@@ -625,17 +616,26 @@ static void run(void)
     B->g.gb.direct.joypad = pad;
     if (S.adc_state == 4) { if (!S.sel_since) S.sel_since = now | 1; else if (now - S.sel_since > 1500000) { quit(); return; } }
     else S.sel_since = 0;
+    int skip = 0;
     if (SN.on) {                                                  /* build 50: paced by the sound clock */
         if (!snd_ready()) return;
+        /* Build 52: owner on 51: crackles when Mario moves (scrolling costs more than the 16.7 ms a frame has).
+         * Behind by a chunk or more: emulate this frame without drawing it (Peanut skips its line rendering;
+         * about half a frame's time on the PC), so the sound catches up and the picture drops a frame instead. */
+        int32_t q = (int32_t)(snd_p - (snd_n + 1u) * CHF);
+        skip = q < (int32_t)SKIP_BELOW;
         uint32_t a0 = now_us();
         snd_produce(B->snd);
         S.snd_us += now_us() - a0;
     } else if ((int32_t)(now - S.next) < 0) return;
     S.line_us = 0;
+    B->g.gb.direct.frame_skip = skip != 0;                        /* Peanut: no lines while frame_skip && !count */
+    B->g.gb.display.frame_skip_count = 0;
+    if (skip) S.skips++;
     uint32_t t0 = now_us();
     gb_run_frame(&B->g.gb);
     uint32_t t1 = now_us();
-    push_async();
+    if (!skip || S.top_dirty) { push_async(S.top_dirty ? 0 : GB_Y); S.top_dirty = 0; }
     uint32_t t2 = now_us();
     S.emu_us += (t1 - t0) - S.line_us;
     S.draw_us += S.line_us;
