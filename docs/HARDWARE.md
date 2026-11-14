@@ -171,7 +171,9 @@ out text wider than its current advances (clipping or scrolling).
   loader (0x030680AE) loads module `table[0x030057C0 + 0xC4 + 4*id]` with type 7; descriptor pointers at +4.
   Ids: 0 MainMenu (m21), 1 MediaLib (m22), 2 MediaBro (m23), 3 Music/Now Playing (m27), 6 Picture (m17),
   8 Ebook (m30), 9 Browser (m31), 10 Systemset + game list (m32), 11 USB (m9), 12 Charge (m6), 13 (m5),
-  14.. games: 14 Snake (m81), **15 block game (m82)**, 16.. other games (game list launches 0xE..0x2B).
+  14.. games: task 14 + k = module 81 + k = text id 273 + k (game list launches 0xE..0x2B); see "Stock games"
+  below. (Until build 55 this line said "14 Snake, 15 block game": m81's only strings are "Block_Game.c" and a copied
+  "Snake KeyVal" log line, so 14 is the block game and 15 (m82, now Blockz) was Snake.)
 - Main menu: focus index u16 at 0x03023B94; tile actions via tbb at 0x030818B0: 0 Music, **1 Games
   (0x03081960: TaskSwitch(10, &7) = game list)**, 2/3 task 9, 4/5 task 10 pages. Returning to the menu:
   TaskSwitch(0, &index). Build 21 makes tile 1 call TaskSwitch(15, 0).
@@ -444,6 +446,17 @@ out text wider than its current advances (clipping or scrolling).
   0x03090800..0x0309F7C0 and the overlay window after its own code (to 0x0308BF84); the music engine stays.
 - **Unused file space for a large module:** stock games 87..99 (tasks 20..32) are contiguous in code.bin
   0x95578..0xA3EC0 (58 KB) and unreachable since build 21's menu; m100 (donor) starts right after.
+- **Stock games (traced 2026-11-14, build 55):** names in text.bin, English = language block 2 at 0x48EC + 2 x
+  0x14896; fixed 0x112-byte UTF-16 records, text id n at block + 0x13C0 + (n - 86) x 0x112. Id 272 "Game", then 273..301
+  one per task 14..42 in order: Retro Block Puzzle, Snake, Box Pusher, Brick Breaker, Block Shooter, Tank Battle,
+  Gomoku, Minesweeper, Maze, Sudoku, Make 24, Number Merge, Number Slide, Match 3, Pair Link, Reversi, Jigsaw Puzzle,
+  Memory Match, Fruit Catch, Car Racing, Gold Catch, Sky Shooter, Bubble Pop, Chinese Checkers, Frog Crossing,
+  Block Puzzle+, Space Battle, Chinese Chess, Mole Hunt (task 43 also -> m109). Order confirmed by m81 =
+  Block_Game.c and by size (the two largest intact modules, m104 9.6 KB and m108 11.1 KB, are Chinese Checkers and
+  Chinese Chess). Untouched in amuletOS (byte-identical to stock): tasks 14, 16, 17, 18, 34..42. Reused: 15 Blockz,
+  19 Playlists, 20..32 the Games screen span, 33 the extension donor. Every game quits with TaskSwitch(10, &7) (the
+  stock game list, Settings page 7); build 55 patches the untouched ones to TaskSwitch(20) (`games_back`). The stock
+  list itself (Settings > Game) still lists all 29, including the reused ones.
 - **Owner's /f/roms/gb:** Tetris (World) (Rev 1), Kirby's Dream Land 2, Final Fantasy Adventure (USA) and My
   Friendly Little Island Deluxe are colourised hacks with header 0x143 = 0xC0 (Game Boy Color only); original
   Game Boy games there: Super Mario Land, Catrap, Pipe Dream, QIX, Burger Time Deluxe, Picross 2, Embers of Mana,

@@ -55,6 +55,13 @@ PATCHES = {
         (21, 0x03081966, "6946", "0021"),     # mov r1, sp -> movs r1, #0
         (21, 0x03081968, "0a20", "0f20"),     # movs r0, #0xa -> movs r0, #0xf
     ],
+    # Build 55: the stock games still in the firmware quit with TaskSwitch(10, &7), the stock game list, which also
+    # lists the games whose modules we reuse (opening one of those would crash). They come back to task 20, the
+    # Games screen (game/device/gbprobe.c), instead: movs r0, #0xa -> movs r0, #0x14 before each exit call.
+    "games_back": [(m, a, "0a20", "1420") for m, a in (
+        (81, 0x03081E6E), (83, 0x030820B8), (84, 0x03082146), (85, 0x030834FC), (101, 0x0308229E),
+        (102, 0x03082054), (103, 0x03082748), (104, 0x03083A06), (105, 0x03082484), (106, 0x030827BA),
+        (107, 0x03082398), (108, 0x03083F72), (109, 0x03082668), (109, 0x03083FA4))],
 }
 
 # ---- patches built from assembly ----

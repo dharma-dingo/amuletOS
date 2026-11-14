@@ -8,9 +8,9 @@
  *   line 2: milliseconds per frame spent emulating, drawing (stock Window + Pixel) and pushing (stock flush)
  *   bottom: page cache (pages, loads per second, ms spent loading), cartridge RAM size
  *   line 4: raw button ADC, GPIO key level, the held Game Boy buttons, the last GetKey event
- * List row "Test core B memory": reads the second core's RAM from this core (may crash: that is the answer).
- * Last row "Benchmark" (build 43): cycles per loop iteration and per read in each memory area (see bench()).
- * List row "Sound test" (build 48): a tone through stock's audio path, 1 s left then 1 s right (snd_open()).
+ * Build 55 (owner): the Games screen is one list with two headed sections, "Emu" (the ROMs in /_gb) and
+ * "Built-in" (the stock games whose modules are untouched; their exits come back here, patch_code.py games_back).
+ * The test rows (Sound test, core B memory, Benchmark; builds 43..54) are gone (owner).
  * Build 50: game sound (minigb_apu), paced by the sound output. Hold Select for 1.5 s to quit. No saves.
  * Build 53 (owner): no stats; the picture fills the screen height (266 x 240) in a DMG look (gb_scale.h).
  *
@@ -74,7 +74,7 @@ extern char _text_end[];             /* module.ld: end of this module's code */
 #define ROWS     7
 #define NLIST    24
 
-enum { ST_LIST, ST_NOCARD, ST_NODIR, ST_EMPTY, ST_RUN, ST_ERR, ST_CORE_B, ST_BENCH, ST_QUIT, ST_SOUND };
+enum { ST_LIST, ST_RUN, ST_ERR, ST_QUIT };   /* build 55: no card / folder / games are list messages (S.emsg) */
 
 typedef struct {
     uint32_t first, len;
@@ -89,6 +89,7 @@ typedef struct {                     /* everything big, at U_BASE */
     uint8_t sec[512];
     int16_t snd[AUDIO_SAMPLES_TOTAL];  /* one frame of sound before conversion (build 50) */
     gbs_t scale;                       /* full-height picture tables (build 53) */
+    uint32_t keep;                     /* build 55: KEEP_TAG | top << 8 | sel, the row to come back to */
 } big_t;
 #define B ((big_t *)U_BASE)
 
@@ -102,8 +103,7 @@ static struct {
     uint32_t skips;
     uint32_t last_ev, err;
     const rom_t *rom;
-    uint32_t cb_read, cb_rw;          /* core B test results */
-    uint32_t bench[10];               /* Benchmark row: cycles x 10 */
+    const char *emsg;                 /* build 55: shown in the Emu section instead of ROMs (no card / folder / games) */
 } S;
 
 /* ---- text (stock 16 px font, drawn as runs; as playlists.c) ---- */
@@ -422,15 +422,55 @@ static void snd_produce(int16_t *tmp)
     snd_p = p + AUDIO_SAMPLES;
 }
 
-static void snd_service(void)                            /* tone test */
+/* ---- list (build 55): "Emu" heading, the ROMs (or a message), "Built-in" heading, the stock games ---- */
+/* Stock games that are still in the firmware (docs/HARDWARE.md "Stock games"): task and English name (text.bin id
+ * 273 + task - 14). Tasks 15 and 19..33 hold Blockz, Playlists, this module and the extension donor now. */
+static const struct { uint8_t task; char name[19]; } STOCK[] = {
+    { 14, "Retro Block Puzzle" }, { 16, "Box Pusher" }, { 17, "Brick Breaker" }, { 18, "Block Shooter" },
+    { 34, "Gold Catch" }, { 35, "Sky Shooter" }, { 36, "Bubble Pop" }, { 37, "Chinese Checkers" },
+    { 38, "Frog Crossing" }, { 39, "Block Puzzle+" }, { 40, "Space Battle" }, { 41, "Chinese Chess" },
+    { 42, "Mole Hunt" } };
+#define NSTOCK   ((int)(sizeof STOCK / sizeof STOCK[0]))
+#define KEEP_TAG 0x4B500000u
+enum { R_HEAD_EMU, R_ROM, R_MSG, R_HEAD_BUILTIN, R_STOCK };
+
+static int emu_rows(void) { return S.emsg ? 1 : S.nlist; }
+static int row_count(void) { return emu_rows() + 2 + NSTOCK; }
+static int row_kind(int i, int *idx)
 {
-    if (!SN.on || !SN.tone) return;
-    uint32_t el = now_us() - SN.t0;
-    if (el >= 2000000) { snd_close(); redraw(); return; }
-    if (el >= 1000000 && !SN.side) { SN.side = 1; redraw(); }
+    int e = emu_rows();
+    if (i == 0) return R_HEAD_EMU;
+    if (i <= e) { *idx = i - 1; return S.emsg ? R_MSG : R_ROM; }
+    if (i == e + 1) return R_HEAD_BUILTIN;
+    *idx = i - e - 2;
+    return R_STOCK;
+}
+static int selectable(int i)
+{
+    int k, n = row_count();
+    if (i < 0 || i >= n) return 0;
+    k = row_kind(i, &n);
+    return k == R_ROM || k == R_STOCK;
+}
+static void show_sel(void)                                /* scroll so the selection (and its heading) shows */
+{
+    if (S.sel < S.top) S.top = S.sel;
+    if (S.top == S.sel && S.sel > 0 && !selectable(S.sel - 1)) S.top = S.sel - 1;
+    if (S.sel >= S.top + ROWS) S.top = S.sel - ROWS + 1;
+}
+static void move_sel(int d)
+{
+    int n = row_count(), s = S.sel;
+    for (int k = 0; k < n; k++) {
+        s += d;
+        if (s < 0) s = n - 1;
+        if (s >= n) s = 0;
+        if (selectable(s)) break;
+    }
+    S.sel = s;
+    show_sel();
 }
 
-/* ---- list ---- */
 static int list_cb(const exent_t *e, int match, void *ctx)
 {
     if (e->is_dir || S.nlist >= NLIST) return 0;
@@ -449,9 +489,9 @@ static void build_list(void)
     static const uint16_t gbdir[] = { '_', 'G', 'B' };
     exdir_t root, dir;
     ex_root(&root);
-    if (!ex_find(&root, gbdir, 3, 1, &dir, 0)) { S.state = ST_NODIR; return; }
+    if (!ex_find(&root, gbdir, 3, 1, &dir, 0)) { S.emsg = "No _gb folder"; return; }
     ex_walk(&dir, 0, 0, list_cb, 0);
-    if (!S.nlist) { S.state = ST_EMPTY; return; }
+    if (!S.nlist) { S.emsg = "No games"; return; }
     for (int i = 0; i < S.nlist; i++) {                           /* header byte 0x143: 0xC0 = Game Boy Color only */
         rom_t *r = &B->list[i];
         r->cgb = 0;
@@ -465,11 +505,16 @@ static void init(void)
 {
     uint8_t *p = (uint8_t *)&S;
     for (unsigned i = 0; i < sizeof S; i++) p[i] = 0;
-    if (!S8(0x1F)) S.state = ST_NOCARD;
+    if (!S8(0x1F)) S.emsg = "No SD card";
     else {
         if (S8(0x0E) != 4) { S8(0x0E) = 4; DiskSwitch(4); }
-        if (ex_init()) S.state = ST_NOCARD;
+        if (ex_init()) S.emsg = "No SD card";
         else build_list();
+    }
+    S.sel = -1; move_sel(1);                                      /* first game */
+    if ((B->keep & 0xFFFF0000u) == KEEP_TAG) {                    /* back from a game: the same row */
+        int s = (int)(B->keep & 0xFF), t = (int)((B->keep >> 8) & 0xFF);
+        if (selectable(s) && t <= s && s < t + ROWS) { S.sel = s; S.top = t; }
     }
     GameEnterA();
     GameEnterB();
@@ -489,6 +534,19 @@ static void quit(void)
     snd_close();
     GameLeaveB();
     TaskSwitch(0, &tile);
+    S.state = ST_QUIT;
+}
+
+/* A stock game (build 55): leave as quit() does, then its task. The stock list passed its own argument; the games
+ * we checked do not read it, so it is zero. Their exits come back to task 20 (patch_code.py games_back). */
+static void launch(uint32_t task)
+{
+    static uint16_t arg[14];
+    B->keep = KEEP_TAG | (uint32_t)S.top << 8 | (uint32_t)S.sel;
+    push_wait();
+    snd_close();
+    GameLeaveB();
+    TaskSwitch(task, arg);
     S.state = ST_QUIT;
 }
 
@@ -587,105 +645,6 @@ static void run(void)
     if ((int32_t)(t2 - S.next) > (int32_t)(3 * FRAME_US)) { S.next = t2; S.late++; }
 }
 
-static void core_b_test(void)
-{
-    volatile uint32_t *p = (volatile uint32_t *)0x01000000u, *q = (volatile uint32_t *)0x0102E000u;
-    S.cb_read = *p;
-    uint32_t v = *q;
-    *q = ~v;
-    S.cb_rw = (*q == ~v) ? 1 : 2;
-    *q = v;
-    S.state = ST_CORE_B;
-    redraw();
-}
-
-
-/* ---- Benchmark row (build 43): owner on 42: EMU 13.3 ms a frame at 200 MHz, ~150x the PC (expected 20-40x).
- * Cycle counts from SysTick (build 44; the DWT counter does not run here), interrupts off, so they show memory and
- * fetch speed alone:
- *   [0] loop in our code (overlay window), per iteration ("subs; bne": 2-3 cycles with no wait states)
- *   [1] the same loop copied to the probe region (0x03090800..), [2] copied to the stack
- *   [3..6] cycles per 32-bit read: probe region, data window 0x03023B48, framebuffer 0x03006688, overlay window
- *   [7] the code-window loop with interrupts on (other threads / interrupts included), [8] music playing (1/0)
- *   [9] cycle counter running (1/0) */
-#define DEMCR   (*(volatile uint32_t *)0xE000EDFCu)
-#define DWT_CTL (*(volatile uint32_t *)0xE0001000u)
-#define CYCCNT  (*(volatile uint32_t *)0xE0001004u)
-/* Build 44: the DWT cycle counter does not count on this chip (owner: all values 0 on 43). SysTick counts down at
- * the core clock from LOAD (2,000,000 per 10 ms tick at 200 MHz) and keeps counting with interrupts off, so any
- * span under one tick is (start - end) modulo LOAD + 1. Each measurement below stays well under 10 ms. */
-static uint32_t st_span(uint32_t v0, uint32_t v1) { return v0 >= v1 ? v0 - v1 : v0 + ST_LOAD + 1u - v1; }
-
-__attribute__((noinline, aligned(4))) static void spin(uint32_t n)
-{
-    __asm volatile("1: subs %0, %0, #1;  bne 1b" : "+r"(n));
-}
-
-static uint32_t cyc_spin(void (*f)(uint32_t), uint32_t n)
-{
-    uint32_t c0 = ST_VAL;
-    f(n);
-    return st_span(c0, ST_VAL) * 10u / n;
-}
-
-static uint32_t cyc_read(const volatile uint32_t *p, uint32_t words)
-{
-    uint32_t sum = 0, c0 = ST_VAL;
-    for (uint32_t r = 0; r < 8; r++)
-        for (uint32_t i = 0; i < words; i += 4) sum += p[i] + p[i + 1] + p[i + 2] + p[i + 3];
-    uint32_t c = st_span(c0, ST_VAL);
-    __asm volatile("" :: "r"(sum));
-    return c * 10u / (8 * words);
-}
-
-/* Build 45: one step per service call, results drawn as they come (owner on 44: "Error 17998584" right after
- * Benchmark: something in the run scrambled the probe's state). The riskiest step, running code copied onto the
- * stack, goes last; the screen shows how far it got. */
-#define BENCH_STEPS 8
-static void bench_step(void)
-{
-    static const uint16_t body[4] = { 0x3801, 0xD1FD, 0x4770, 0xBF00 };   /* subs r0, #1; bne -4; bx lr; nop */
-    uint32_t *b = S.bench, k = S.bstep;
-    if (k == 0) b[8] = ThreadRunning(*(volatile uint32_t *)0x030232BCu, 0x030361A4) == 1;
-    if (k == 5) {                                                   /* interrupts on, timed with the tick counter */
-        uint32_t t0 = now_us();
-        spin(2000000);
-        b[7] = (now_us() - t0) * 200u * 10u / 2000000u;
-    } else if (k == 6) {                                            /* loop copied into the probe region */
-        uint16_t *u = (uint16_t *)(U_BASE + 0x100);
-        for (int i = 0; i < 4; i++) u[i] = body[i];
-        __asm volatile("dsb; isb" ::: "memory");
-        __asm volatile("cpsid i" ::: "memory");
-        b[1] = cyc_spin((void (*)(uint32_t))((uint32_t)u | 1), 50000);
-        __asm volatile("cpsie i" ::: "memory");
-    } else if (k == 7) {                                            /* loop copied onto the stack */
-        uint16_t st[8] __attribute__((aligned(4)));
-        for (int i = 0; i < 4; i++) st[i] = body[i];
-        __asm volatile("dsb; isb" ::: "memory");
-        __asm volatile("cpsid i" ::: "memory");
-        b[2] = cyc_spin((void (*)(uint32_t))((uint32_t)st | 1), 50000);
-        __asm volatile("cpsie i" ::: "memory");
-    } else {
-        __asm volatile("cpsid i" ::: "memory");
-        if (k == 0) b[0] = cyc_spin(spin, 50000);
-        if (k == 1) b[3] = cyc_read((const volatile uint32_t *)(U_BASE + 0x1000), 2048);
-        if (k == 2) b[4] = cyc_read((const volatile uint32_t *)0x03023B48u, 256);
-        if (k == 3) b[5] = cyc_read((const volatile uint32_t *)0x03006688u, 2048);
-        if (k == 4) b[6] = cyc_read((const volatile uint32_t *)(((uint32_t)_text_end + 3) & ~3u), 2048);
-        __asm volatile("cpsie i" ::: "memory");
-    }
-    S.bstep = (uint8_t)(k + 1);
-    redraw();
-}
-
-static void bench(void)
-{
-    for (int i = 0; i < 10; i++) S.bench[i] = 0;
-    S.bstep = 0;
-    S.state = ST_BENCH;
-    redraw();
-}
-
 /* Build 51: the wheel changes the volume in games (owner on 50: it did nothing). Stock's SetVolume writes the codec;
  * it switches the amp off at 0 and on again only while the player runs, so the amp is ours. */
 static void wheel(int d)
@@ -701,8 +660,6 @@ static void wheel(int d)
 static int32_t service(void)
 {
     if (S.state == ST_QUIT) return -1;
-    if (S.state == ST_BENCH && S.bstep < BENCH_STEPS && !S.dirty) bench_step();
-    if (S.state == ST_SOUND) snd_service();
     if (S.state == ST_RUN) {
         for (int n = 0; n < 8; n++) {
             uint32_t ev = GetKey(); if (!ev) break; S.last_ev = ev;
@@ -718,24 +675,16 @@ static int32_t service(void)
         uint32_t type = ev >> 24, k = ev & 0x1FF;
         if (type != EV_PRESS && type != 0x30) continue;
         if (k == K_B || (k == K_LEFT && type == EV_PRESS)) { quit(); return -1; }
-        if (S.state == ST_BENCH && S.bstep < BENCH_STEPS) continue;
-        if (S.state == ST_SOUND && SN.on) continue;
-        if (S.state == ST_ERR || S.state == ST_CORE_B || S.state == ST_BENCH || S.state == ST_SOUND) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
+        if (S.state == ST_ERR) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
         if (S.state != ST_LIST) continue;
-        int count = S.nlist + 3;                                   /* + "Sound test", "Test core B memory", "Benchmark" */
         if (k == K_UP || k == K_DOWN) {
-            int s = S.sel + (k == K_DOWN ? 1 : -1);
-            if (s < 0) s = count - 1;
-            if (s >= count) s = 0;
-            S.sel = s;
-            if (S.sel < S.top) S.top = S.sel;
-            if (S.sel >= S.top + ROWS) S.top = S.sel - ROWS + 1;
+            move_sel(k == K_DOWN ? 1 : -1);
             redraw();
-        } else if (k == K_A && type == EV_PRESS) {
-            if (S.sel == S.nlist) { S.state = ST_SOUND; snd_open(1); redraw(); }
-            else if (S.sel == S.nlist + 1) core_b_test();
-            else if (S.sel == S.nlist + 2) bench();
-            else start(&B->list[S.sel]);
+        } else if (k == K_A && type == EV_PRESS && selectable(S.sel)) {
+            int idx = 0, kind = row_kind(S.sel, &idx);
+            if (kind == R_STOCK) { launch(STOCK[idx].task); return -1; }
+            B->keep = KEEP_TAG | (uint32_t)S.top << 8 | (uint32_t)S.sel;
+            start(&B->list[idx]);
             if (S.state == ST_RUN) return 0;
         }
     }
@@ -754,61 +703,32 @@ static void paint(void)
     fill(0, 59, 295, 60, C_INK);
     fill(0, 221, 295, 222, C_INK);
     fill(0, 223, 295, 239, C_SCREEN);
-    say(12, 39, C_INK, "Game Boy", 0, 0, 0, 0, 0);
-    const char *msg = 0;
-    switch (S.state) {
-    case ST_NOCARD: msg = "No SD card"; break;
-    case ST_NODIR:  msg = "No _gb folder"; break;
-    case ST_EMPTY:  msg = "No games"; break;
-    }
+    say(12, 39, C_INK, "Games", 0, 0, 0, 0, 0);
     for (int r = 0; r < ROWS; r++) fill(0, 61 + r * 23, 295, 61 + r * 23 + 22, C_WHITE);
     if (S.state == ST_ERR) {
         if (S.err == 100) say(12, 64, C_INK, "Game Boy Color only", 0, 0, 0, 0, 0);
         else if (S.err == 101) say(12, 64, C_INK, "Over 2 MB", 0, 0, 0, 0, 0);
-        else say(12, 64, C_INK, "Error %d  step %d", S.err, S.bstep, 0, 0, 0);
+        else say(12, 64, C_INK, "Error %d", S.err, 0, 0, 0, 0);
         COLOR = old; return;
     }
-    if (S.state == ST_CORE_B) {
-        say(12, 64, C_INK, "01000000 reads %x", S.cb_read, 0, 0, 0, 0);
-        say(12, 87, C_INK, S.cb_rw == 1 ? "0102E000 write ok" : "0102E000 write lost", 0, 0, 0, 0, 0);
-        COLOR = old; return;
-    }
-    if (S.state == ST_SOUND) {
-        uint32_t el = SN.on ? now_us() - SN.t0 : 0;
-        say(12, 64, C_INK, SN.on ? (el < 1000000 ? "Tone: left" : "Tone: right") : "Tone finished", 0, 0, 0, 0, 0);
-        say(12, 87, C_INK, "DMA %d  late %d  (94 in 2 s)", snd_irqs, snd_under, 0, 0, 0);
-        say(12, 110, C_INK, "Music was playing %d  DAC was on %d", SN.music, SN.dac, 0, 0, 0);
-        say(12, 133, C_INK, "Channel busy %d  volume %d", SN.busy, S8(0x12), 0, 0, 0);
-        uint32_t n = snd_irqs > 1 ? snd_irqs - 1 : 1;
-        say(12, 156, C_INK, "Buffer every %d us (21333)", (snd_t_last - snd_t_first) / n, 0, 0, 0, 0);
-        COLOR = old; return;
-    }
-    if (S.state == ST_BENCH) {
-        const uint32_t *b = S.bench;
-        say(12, 64, C_INK, "Loop %1  read: region %1  data %1", b[0], b[3], b[4], 0, 0);
-        say(12, 87, C_INK, "Read: screen %1  window %1", b[5], b[6], 0, 0, 0);
-        say(12, 110, C_INK, "Loop, interrupts on %1", b[7], 0, 0, 0, 0);
-        say(12, 133, C_INK, "Loop: region %1  stack %1", b[1], b[2], 0, 0, 0);
-        say(12, 156, C_INK, "Music %d  step %d of 8  (cycles)", b[8], S.bstep, 0, 0, 0);
-        COLOR = old; return;
-    }
-    int count = msg ? 0 : S.nlist + 3;
+    int count = row_count();
     for (int r = 0; r < ROWS; r++) {
-        int i = S.top + r, y = 61 + r * 23, on = i == S.sel && i < count;
-        fill(0, y, 295, y + 21, on ? C_TINT : C_WHITE);
+        int i = S.top + r, y = 61 + r * 23, idx = 0, kind = i < count ? row_kind(i, &idx) : -1;
+        int head = kind == R_HEAD_EMU || kind == R_HEAD_BUILTIN, on = i == S.sel && !head && kind >= 0;
+        fill(0, y, 295, y + 21, head ? C_HEAD : on ? C_TINT : C_WHITE);
         if (on) fill(0, y, 3, y + 21, C_GRAPE);
         fill(0, y + 22, 295, y + 22, r == ROWS - 1 ? C_WHITE : C_TRACK);
-        if (msg) { if (r == 0) say(12, y + 3, C_DIM, msg, 0, 0, 0, 0, 0); continue; }
-        if (i >= count) continue;
-        if (i == S.nlist) { say(12, y + 3, C_INK, "Sound test", 0, 0, 0, 0, 0); continue; }
-        if (i == S.nlist + 1) { say(12, y + 3, C_INK, "Test core B memory", 0, 0, 0, 0, 0); continue; }
-        if (i == S.nlist + 2) { say(12, y + 3, C_INK, "Benchmark", 0, 0, 0, 0, 0); continue; }
-        const rom_t *rm = &B->list[i];
-        uint16_t b[EX_NAME + 1];
-        for (int c = 0; c < rm->nlen; c++) b[c] = rm->name[c];
-        b[rm->nlen] = 0;
-        int x = text(12, y + 3, b, rm->cgb == 0xC0 ? C_DIM : C_INK, 290);
-        (void)x;
+        if (kind == R_HEAD_EMU) say(12, y + 3, C_DIM, "Emu", 0, 0, 0, 0, 0);
+        else if (kind == R_HEAD_BUILTIN) say(12, y + 3, C_DIM, "Built-in", 0, 0, 0, 0, 0);
+        else if (kind == R_MSG) say(12, y + 3, C_DIM, S.emsg, 0, 0, 0, 0, 0);
+        else if (kind == R_STOCK) say(12, y + 3, C_INK, STOCK[idx].name, 0, 0, 0, 0, 0);
+        else if (kind == R_ROM) {
+            const rom_t *rm = &B->list[idx];
+            uint16_t t[EX_NAME + 1];
+            for (int c = 0; c < rm->nlen; c++) t[c] = rm->name[c];
+            t[rm->nlen] = 0;
+            text(12, y + 3, t, rm->cgb == 0xC0 ? C_DIM : C_INK, 290);
+        }
     }
     COLOR = old;
 }
