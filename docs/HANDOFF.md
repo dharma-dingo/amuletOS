@@ -339,7 +339,7 @@ been on an August build).
   chunky pixel space-invader creature, white on the card. It must be our own drawing, not a copy of
   RetroArch's logo. Show the owner 2 or 3 icon options as a mockup before building. Touches `menu_carousel`
   (an extra item), the Music menu patch (the row comes out) and `art/pocket.py` (the icon).
-- **Next build: all Game Boy ROMs on the card** (owner, 2026-11-14): copy every .gb from F:oms\gb to the SD card's
+- **Next build: all Game Boy ROMs on the card** (owner, 2026-11-14): copy every .gb from F:\roms\gb to the SD card's
   /_GB when the card is mounted. 4 of the 13 have header byte 0x143 = 0xC0 (Game Boy Color only) and stay greyed
   out: Final Fantasy Adventure (1 MB, a colour hack; the original is 256 KB), Kirby's Dream Land 2 (1 MB colour hack),
   My Friendly Little Island Deluxe (Color homebrew), Tetris (World) (Rev 1) (64 KB colour hack). Playing them needs
