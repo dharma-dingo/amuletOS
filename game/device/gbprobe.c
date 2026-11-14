@@ -271,6 +271,26 @@ static void push_async(void)
 #define SND_WORDS   (SND_FRAMES * 2u)
 
 static void redraw(void);
+/* Build 49: owner on 48: no sound, 984 completions in 2 s (94 expected): the I2S takes words ~10x too fast and the
+ * DAC likely mutes on the bad clock. Snapshot of the audio registers: "stock" at the Sound test's start (start a song
+ * first: the music player's own setup), "ours" 0.5 s into the tone. Two pages each, 7 lines of 3 (snd_regs). */
+static const uint32_t SND_REG[42] = {
+    0x40030000, 0x40030004, 0x40030008,  0x4003000C, 0x40030010, 0x40030014,  0x40030018, 0x4003001C, 0x40030020,
+    0x600001B8, 0x600001C0, 0x600001D0,  0x600001D4, 0x600001F8, 0x600001FC,  0x40160000, 0x40170000, 0x50030000,
+    0x030065C8, 0x03006604, 0x03006608,
+    0x40180000, 0x40180004, 0x40180008,  0x4018000C, 0x40180010, 0x40180014,  0x40180018, 0x4018001C, 0x40180020,
+    0x40180024, 0x40180028, 0x4018002C,  0x40180080, 0x40180084, 0x40180088,  0x4018008C, 0x401800C0, 0x401800C4,
+    0x500100BC, 0x0300660C, 0x00000000,
+};
+/* lines (3 values each), stock pages 1-2 then ours 1-2:
+ *   1 I2S +00 +04 +08   2 I2S +0C +10 +14   3 I2S +18 +1C +20   4 DMA5 SAR DAR CTL_L   5 DMA5 CTL_H CFG_L CFG_H
+ *   6 GPIO0 GPIO1 GPIO2 data   7 clock block 0x030065C0 +08 +44 +48
+ *   8 CRU +00 +04 +08   9 CRU +0C +10 +14   10 CRU +18 +1C +20   11 CRU +24 +28 +2C   12 CRU +80 +84 +88
+ *   13 CRU +8C +C0 +C4   14 GRF +BC, clock block +4C */
+static uint32_t snd_snap[2][42];
+static uint8_t snd_page, snd_have[2];
+static void snd_regs(int k) { for (int i = 0; i < 42; i++) snd_snap[k][i] = SND_REG[i] ? *(volatile uint32_t *)SND_REG[i] : 0; snd_have[k] = 1; }
+static volatile uint32_t snd_t_first, snd_t_last;
 static int32_t *snd_buf[2];
 static volatile uint8_t snd_cur, snd_stop, snd_free[2];
 static volatile uint32_t snd_irqs, snd_under;
@@ -280,6 +300,7 @@ static void snd_done(void)                               /* DMA completion (inte
 {
     uint8_t c = snd_cur ^ 1u;
     snd_irqs++;
+    { uint32_t t = now_us(); if (!snd_t_first) snd_t_first = t; snd_t_last = t; }
     if (snd_stop) { snd_stop = 2; return; }
     if (snd_free[c]) snd_under++;                         /* not refilled in time: it plays again */
     DmaStart(5, (uint32_t)snd_buf[c], I2S_TXDR, SND_WORDS, (void *)AUDIO_DMA, (uint32_t)snd_done);
@@ -304,6 +325,8 @@ static void snd_open(void)
 {
     snd_buf[0] = (int32_t *)((U_BASE + sizeof(big_t) + 31) & ~31u);
     snd_buf[1] = snd_buf[0] + SND_WORDS;
+    snd_have[0] = snd_have[1] = 0; snd_page = 0; snd_t_first = snd_t_last = 0;
+    snd_regs(0);                                          /* stock's state (music playing, if it was) */
     SN.music = ThreadRunning(*(volatile uint32_t *)PHAND, PDESC) == 1;
     if (SN.music) ThreadDelete(PHAND);                    /* its exit powers the DAC down and mutes */
     for (int i = 0; i < 200 && DmaBusy(5); i++) DelayMs(1);
@@ -359,6 +382,7 @@ static void snd_service(void)
     uint32_t el = now_us() - SN.t0;
     if (el >= 2000000) { snd_close(); redraw(); return; }
     if (el >= 1000000) SN.side = 1;
+    if (el >= 500000 && !snd_have[1]) snd_regs(1);
     for (int i = 0; i < 2; i++) if (snd_free[i]) { tone_fill(snd_buf[i]); snd_free[i] = 0; }
 }
 
@@ -659,6 +683,7 @@ static int32_t service(void)
         if (k == K_B || (k == K_LEFT && type == EV_PRESS)) { quit(); return -1; }
         if (S.state == ST_BENCH && S.bstep < BENCH_STEPS) continue;
         if (S.state == ST_SOUND && SN.on) continue;
+        if (S.state == ST_SOUND && (k == K_UP || k == K_DOWN)) { snd_page = (uint8_t)((snd_page + (k == K_DOWN ? 1 : 4)) % 5); redraw(); continue; }
         if (S.state == ST_ERR || S.state == ST_CORE_B || S.state == ST_BENCH || S.state == ST_SOUND) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
         if (S.state != ST_LIST) continue;
         int count = S.nlist + 3;                                   /* + "Sound test", "Test core B memory", "Benchmark" */
@@ -712,12 +737,26 @@ static void paint(void)
         say(12, 87, C_INK, S.cb_rw == 1 ? "0102E000 write ok" : "0102E000 write lost", 0, 0, 0, 0, 0);
         COLOR = old; return;
     }
+    if (S.state == ST_SOUND && snd_page) {
+        int k = (snd_page - 1) / 2, half = (snd_page - 1) % 2;
+        fill(0, 61, 295, 239, C_WHITE);
+        say(12, 64, C_INK, k ? "Ours, page %d of 2" : "Stock, page %d of 2", (uint32_t)half + 1, 0, 0, 0, 0);
+        for (int l = 0; l < 7; l++) {
+            const uint32_t *v = &snd_snap[k][(half * 7 + l) * 3];
+            say(4, 85 + l * 19, C_INK, "%x %x %x", v[0], v[1], v[2], 0, 0);
+        }
+        say(4, 222, C_DIM, "Up / Down: page.  Lines: see notes", 0, 0, 0, 0, 0);
+        COLOR = old; return;
+    }
     if (S.state == ST_SOUND) {
         uint32_t el = SN.on ? now_us() - SN.t0 : 0;
         say(12, 64, C_INK, SN.on ? (el < 1000000 ? "Tone: left" : "Tone: right") : "Tone finished", 0, 0, 0, 0, 0);
         say(12, 87, C_INK, "DMA %d  late %d  (94 a second)", snd_irqs, snd_under, 0, 0, 0);
         say(12, 110, C_INK, "Music was playing %d  DAC was on %d", SN.music, SN.dac, 0, 0, 0);
         say(12, 133, C_INK, "Channel busy %d  volume %d", SN.busy, S8(0x12), 0, 0, 0);
+        uint32_t n = snd_irqs > 1 ? snd_irqs - 1 : 1;
+        say(12, 156, C_INK, "Buffer every %d us (21333)", (snd_t_last - snd_t_first) / n, 0, 0, 0, 0);
+        say(12, 179, C_DIM, "Down: register pages", 0, 0, 0, 0, 0);
         COLOR = old; return;
     }
     if (S.state == ST_BENCH) {
