@@ -50,7 +50,7 @@ void abort(void) { for (;;) {} }
 #define GPIO2      (*(volatile uint32_t *)0x50030000u)
 
 #define U_BASE     0x03090800u
-#define U_END      0x0309F700u   /* build 57: 0x0309F700.. is the timing log (timing.c); was 0x0309F7C0 */
+#define U_END      0x0309F7C0u
 #define WIN_END    0x0308BF84u
 extern char _text_end[];             /* module.ld: end of this module's code */
 
@@ -701,30 +701,30 @@ static int32_t service(void)
 }
 
 /* ---- Timing screen (build 57): the latest start in the timing log (timing.c), times from that start ---- */
-#define TL       ((volatile uint32_t *)0x0309F700u)
-#define TL_MAGIC 0x544C4F47u
-#define TL_N     22u
+#define TL       ((volatile uint32_t *)0x0309F7CCu)   /* build 58 layout (timing.c) */
+#define TL_N     11u
 static void timing_paint(void)
 {
     volatile uint32_t *t = TL;
-    if (t[0] != TL_MAGIC || !t[1]) { say(12, 64, C_INK, "No log yet", 0, 0, 0, 0, 0); return; }
-    uint32_t n = t[1] < TL_N ? t[1] : TL_N, first = t[1] - n;  /* events first .. t[1] - 1 are in the ring */
-    #define EV_T(k)   (t[4 + 2 * ((k) % TL_N)])
-    #define EV_TAG(k) (t[5 + 2 * ((k) % TL_N)] & 0xFF)
-    #define EV_ARG(k) (t[5 + 2 * ((k) % TL_N)] >> 8)
+    uint32_t cnt = t[0] & 0xFFFF, boot = t[1] & 0x7FFFFFFF;
+    if (t[0] >> 16 != 0x544C || !cnt) { say(12, 64, C_INK, "No log yet", 0, 0, 0, 0, 0); return; }
+    uint32_t n = cnt < TL_N ? cnt : TL_N, first = cnt - n;    /* events first .. cnt - 1 are in the ring */
+    #define EV_T(k)   (t[2 + (k) % TL_N] & 0xFFFFF)
+    #define EV_TAG(k) ((t[2 + (k) % TL_N] >> 20) & 0xF)
+    #define EV_ARG(k) (t[2 + (k) % TL_N] >> 24)
     uint32_t s = first, k;                    /* latest start: a track step or the Now Playing screen (module 27) */
-    for (k = t[1]; k-- > first; ) if (EV_TAG(k) == 7 || (EV_TAG(k) == 2 && (EV_ARG(k) & 0xFF) == 27)) { s = k; break; }
+    for (k = cnt; k-- > first; ) if (EV_TAG(k) == 7 || (EV_TAG(k) == 2 && (EV_ARG(k) & 0xFF) == 27)) { s = k; break; }
     uint32_t t0 = EV_T(s), snd = 0;                           /* times: stock's 10 ms tick */
-    for (k = s; k < t[1]; k++) if (EV_TAG(k) == 6) { snd = (EV_T(k) - t0) * 10u + 1; break; }
+    for (k = s; k < cnt; k++) if (EV_TAG(k) == 6) { snd = ((EV_T(k) - t0) & 0xFFFFF) * 10u + 1; break; }
     int y = 64;
-    if (t[2]) say(12, y, C_INK, "Boot to menu %1 s", t[2] / 10u, 0, 0, 0, 0);
+    if (boot) say(12, y, C_INK, "Boot to menu %1 s", boot / 10u, 0, 0, 0, 0);
     y += 22;
     if (snd) say(12, y, C_INK, "Start to sound %d ms", snd - 1, 0, 0, 0, 0);
     else say(12, y, C_DIM, "No sound after the last start", 0, 0, 0, 0, 0);
     y += 22;
-    if (S.ttop > (int)(t[1] - s) - 1) S.ttop = (int)(t[1] - s) - 1;
-    for (k = s + (uint32_t)S.ttop; k < t[1] && y < 200; k++, y += 22) {
-        uint32_t ms = (EV_T(k) - t0) * 10u, a = EV_ARG(k);
+    if (S.ttop > (int)(cnt - s) - 1) S.ttop = (int)(cnt - s) - 1;
+    for (k = s + (uint32_t)S.ttop; k < cnt && y < 200; k++, y += 22) {
+        uint32_t ms = ((EV_T(k) - t0) & 0xFFFFF) * 10u, a = EV_ARG(k);
         switch (EV_TAG(k)) {
         case 2: say(12, y, C_INK, "%d  Load %d", ms, a & 0xFF, 0, 0, 0); break;
         case 3: say(12, y, C_INK, "%d  Music init", ms, 0, 0, 0, 0); break;
