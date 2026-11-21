@@ -706,14 +706,14 @@ static int32_t service(void)
 static void timing_paint(void)
 {
     volatile uint32_t *t = TL;
-    uint32_t cnt = t[0] & 0xFFFF, boot = t[1] & 0x7FFFFFFF;
+    uint32_t cnt = t[0] & 0xFFFF, boot = t[1] & 0x3FFFFFFF;
     if (t[0] >> 16 != 0x544C || !cnt) { say(12, 64, C_INK, "No log yet", 0, 0, 0, 0, 0); return; }
     uint32_t n = cnt < TL_N ? cnt : TL_N, first = cnt - n;    /* events first .. cnt - 1 are in the ring */
     #define EV_T(k)   (t[2 + (k) % TL_N] & 0xFFFFF)
     #define EV_TAG(k) ((t[2 + (k) % TL_N] >> 20) & 0xF)
     #define EV_ARG(k) (t[2 + (k) % TL_N] >> 24)
-    uint32_t s = first, k;                    /* latest start: a track step or the Now Playing screen (module 27) */
-    for (k = cnt; k-- > first; ) if (EV_TAG(k) == 7 || (EV_TAG(k) == 2 && (EV_ARG(k) & 0xFF) == 27)) { s = k; break; }
+    uint32_t s = first, k;                    /* latest start: a track step or the switch to Now Playing (screen 3) */
+    for (k = cnt; k-- > first; ) if (EV_TAG(k) == 7 || (EV_TAG(k) == 1 && EV_ARG(k) == 3)) { s = k; break; }
     uint32_t t0 = EV_T(s), snd = 0;                           /* times: stock's 10 ms tick */
     for (k = s; k < cnt; k++) if (EV_TAG(k) == 6) { snd = ((EV_T(k) - t0) & 0xFFFFF) * 10u + 1; break; }
     int y = 64;
@@ -726,12 +726,12 @@ static void timing_paint(void)
     for (k = s + (uint32_t)S.ttop; k < cnt && y < 200; k++, y += 22) {
         uint32_t ms = ((EV_T(k) - t0) & 0xFFFFF) * 10u, a = EV_ARG(k);
         switch (EV_TAG(k)) {
+        case 1: say(12, y, C_INK, "%d  Screen %d", ms, a, 0, 0, 0); break;
         case 2: say(12, y, C_INK, "%d  Load %d", ms, a & 0xFF, 0, 0, 0); break;
         case 3: say(12, y, C_INK, "%d  Music init", ms, 0, 0, 0, 0); break;
         case 4: say(12, y, C_INK, "%d  Audio start", ms, 0, 0, 0, 0); break;
         case 6: say(12, y, C_INK, "%d  First sound", ms, 0, 0, 0, 0); break;
         case 7: say(12, y, C_INK, "%d  Track step", ms, 0, 0, 0, 0); break;
-        case 8: say(12, y, C_INK, "%d  Menu", ms, 0, 0, 0, 0); break;
         default: say(12, y, C_DIM, "%d  ?", ms, 0, 0, 0, 0); break;
         }
     }

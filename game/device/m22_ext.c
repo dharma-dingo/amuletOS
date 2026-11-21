@@ -16,11 +16,11 @@
 extern const uint16_t music_menu[];                       /* m22_ext.S: {icon, text id, action} x 8 */
 
 /* v0.4 timing log (build 57; timing.c / timing.S in slot 2). ModuleOverlay and the audio refill interrupt run
- * before stock loads slot 2 at boot, so they are hooked here, in RAM, once the Music menu draws (module 0 stays in
+ * (and TaskSwitch, build 59) before stock loads slot 2 at boot, so they are hooked here, in RAM, once the Music menu draws (module 0 stays in
  * RAM until power-off; a site is only patched while it still holds stock's bytes). Here rather than in the main
  * menu: if writing module 0 ever faulted, only this menu would break, and a normal update would still work.
  * H_ names are slot-2 addresses (tools/extend_module.py, from helpers.json). */
-extern const char H_t_ovl[], H_t_irq[];
+extern const char H_t_task[], H_t_ovl[], H_t_irq[];
 
 static void hook_bw(uint32_t at, uint32_t to, uint32_t stock)
 {
@@ -39,6 +39,7 @@ static void hook_bw(uint32_t at, uint32_t to, uint32_t stock)
 
 static void tlog_install(void)
 {
+    hook_bw(0x030680D4u, (uint32_t)H_t_task, 0x18702E4Bu);     /* TaskSwitch: ldr r3, [pc, #0xb8]; strb r0, [r3] */
     hook_bw(0x030683DEu, (uint32_t)H_t_ovl, 0x4FF0E92Du);      /* ModuleOverlay: push.w {r4-r11, lr} */
     hook_bw(0x030661A4u, (uint32_t)H_t_irq, 0x43F0E92Du);      /* audio refill: push.w {r4-r9, lr} */
 }
