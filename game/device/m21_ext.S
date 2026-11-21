@@ -27,6 +27,7 @@ menu_idx_init:
 1:  movs    r1, #1                  @ fresh boot: Music (owner, build 33)
 2:  strh    r1, [r0]
     bl      menu_art                @ grey Now Playing unless the player runs
+    bl      tlog_install            @ v0.4 timing log: boot time (build 57, m21_ext.c)
     pop     {r0, pc}
     .ltorg
 

@@ -11,6 +11,9 @@
     .thumb_func
 pl_step_hook:
     push    {r0-r3, r12, lr}
+    movs    r2, #7                  @ timing log (build 57, timing.c): track step
+    bl      tlog_hook
+    ldmia   sp, {r0, r1}
     bl      pl_step
     cmp     r0, #0
     pop     {r0-r3, r12, lr}

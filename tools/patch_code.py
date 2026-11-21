@@ -225,6 +225,16 @@ def menu_carousel():
         (21, 0x03081B8A, "00f0f3b8", thumb_bw(0x03081B8A, h["menu_key_more"]).hex()),    # Start press -> Settings
     ]
 
+def timing():
+    """v0.4 timing log (build 57): player thread init (MusicInit) and Audio Start (module 33) branch to slot-2 stubs
+    (game/device/timing.S) that log them and replay the replaced push. Module 0's sites are hooked at run time
+    (m21_ext.c tlog_install)."""
+    h = syms()
+    return [
+        (33, 0x0308DDD0, "2de9f043", thumb_bw(0x0308DDD0, h["t_music"]).hex()),
+        (33, 0x0308C8EE, "2de9f04f", thumb_bw(0x0308C8EE, h["t_astart"]).hex()),
+    ]
+
 def music_update():
     """Music menu (module 22) gets an eighth item, "Update", running stock's index-8 library update, forced past
     the fingerprint check (libscan.c lib_force). The 8-entry table lives in slot 2 (np_stub.S music_menu)."""
@@ -280,7 +290,7 @@ def settings_game():
          (thumb_bw(0x0308247C, sym["settings_enter"]) + bytes.fromhex("00bf") * 6).hex()),
     ]
 
-GENERATED = {"settings_game": settings_game, "playlists": playlists, "menu_carousel": menu_carousel, "music_update": music_update, "np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
+GENERATED = {"timing": timing, "settings_game": settings_game, "playlists": playlists, "menu_carousel": menu_carousel, "music_update": music_update, "np_title_tag": np_title_tag, "np_v2": np_v2, "np_v3": np_v3, "np_v4": np_v4, "lib_skip": lib_skip}
 
 def file_off(code, mod, addr):
     cl, ce, cs = struct.unpack_from("<3I", code, 8 + 32 * mod)

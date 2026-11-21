@@ -66,10 +66,15 @@ def main():
     ext_run = (ce + cs + 3) & ~3
     work = os.path.join(a.out, f"ext{a.module}_build"); os.makedirs(work, exist_ok=True)
     elf, binf = os.path.join(work, "ext.elf"), os.path.join(work, "ext.bin")
+    # slot-2 helpers as absolute H_<name> symbols (build 57: the main menu installs the timing hooks); taken as data
+    # addresses so the linker never treats them as ARM code
+    hj = os.path.join(a.src, "helpers.json")
+    defsyms = [f"-Wl,--defsym=H_{k}={v:#x}" for k, v in (json.load(open(hj)).items() if os.path.exists(hj) else ())
+               if k[:1].isalpha() and k.replace("_", "").isalnum()]
     run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
         "-fno-tree-loop-distribute-patterns", "-ffunction-sections", "-Wall", "-Wextra", "-Wno-unused-parameter",
         "-I", os.path.join(ROOT, "game"), f"-Wl,-Ttext={ext_run:#x}", "-Wl,--no-warn-rwx-segments", "-Wl,-e,0",
-        "-Wl,-Map=" + os.path.join(work, "ext.map"), "-o", elf, *a.sources)
+        "-Wl,-Map=" + os.path.join(work, "ext.map"), *defsyms, "-o", elf, *a.sources)
     sizes = {f[0]: int(f[1], 16) for f in (l.split() for l in run(tool("size"), "-A", "-x", elf).splitlines())
              if len(f) == 3 and f[0].startswith(".")}
     for s in (".data", ".bss", ".rodata"):

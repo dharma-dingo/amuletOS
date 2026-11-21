@@ -22,6 +22,16 @@ void menu_art(void)
     MENU_IMG(4) = on ? 22 : 24;
 }
 
+/* v0.4 timing log (build 57; timing.c in slot 2): the first main menu after power-on = boot time (tag 8). The hooks
+ * themselves are installed from the Music menu (m22_ext.c tlog_install), away from the boot path. H_ names are
+ * slot-2 addresses (tools/extend_module.py, from helpers.json). */
+extern const char H_tlog_hook[];
+
+void tlog_install(void)
+{
+    ((void (*)(uint32_t, uint32_t, uint32_t))((uint32_t)H_tlog_hook | 1))(0, 0, 8);
+}
+
 /* Games tile action (build 54, patch_code.py menu_carousel): the Game Boy list, task 20 (game/device/gbprobe.c) */
 void menu_games(void)
 {

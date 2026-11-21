@@ -11,6 +11,7 @@
  * Build 55 (owner): the Games screen is one list with two headed sections, "Emu" (the ROMs in /_gb) and
  * "Built-in" (the stock games whose modules are untouched; their exits come back here, patch_code.py games_back).
  * The test rows (Sound test, core B memory, Benchmark; builds 43..54) are gone (owner).
+ * Build 57 (v0.4 speed work): a last row "Timing" shows the play-start log (timing.c); it goes once v0.4 is done.
  * Build 50: game sound (minigb_apu), paced by the sound output. Hold Select for 1.5 s to quit. No saves.
  * Build 53 (owner): no stats; the picture fills the screen height (266 x 240) in a DMG look (gb_scale.h).
  *
@@ -49,7 +50,7 @@ void abort(void) { for (;;) {} }
 #define GPIO2      (*(volatile uint32_t *)0x50030000u)
 
 #define U_BASE     0x03090800u
-#define U_END      0x0309F7C0u
+#define U_END      0x0309F700u   /* build 57: 0x0309F700.. is the timing log (timing.c); was 0x0309F7C0 */
 #define WIN_END    0x0308BF84u
 extern char _text_end[];             /* module.ld: end of this module's code */
 
@@ -74,7 +75,7 @@ extern char _text_end[];             /* module.ld: end of this module's code */
 #define ROWS     7
 #define NLIST    24
 
-enum { ST_LIST, ST_RUN, ST_ERR, ST_QUIT };   /* build 55: no card / folder / games are list messages (S.emsg) */
+enum { ST_LIST, ST_RUN, ST_ERR, ST_QUIT, ST_TIMING };   /* build 55: no card / folder / games are list messages (S.emsg) */
 
 typedef struct {
     uint32_t first, len;
@@ -104,6 +105,7 @@ static struct {
     uint32_t last_ev, err;
     const rom_t *rom;
     const char *emsg;                 /* build 55: shown in the Emu section instead of ROMs (no card / folder / games) */
+    int ttop;                         /* build 57: first event line shown on the Timing screen */
 } S;
 
 /* ---- text (stock 16 px font, drawn as runs; as playlists.c) ---- */
@@ -432,10 +434,10 @@ static const struct { uint8_t task; char name[19]; } STOCK[] = {
     { 42, "Mole Hunt" } };
 #define NSTOCK   ((int)(sizeof STOCK / sizeof STOCK[0]))
 #define KEEP_TAG 0x4B500000u
-enum { R_HEAD_EMU, R_ROM, R_MSG, R_HEAD_BUILTIN, R_STOCK };
+enum { R_HEAD_EMU, R_ROM, R_MSG, R_HEAD_BUILTIN, R_STOCK, R_TIMING };
 
 static int emu_rows(void) { return S.emsg ? 1 : S.nlist; }
-static int row_count(void) { return emu_rows() + 2 + NSTOCK; }
+static int row_count(void) { return emu_rows() + 2 + NSTOCK + 1; }   /* + "Timing" (build 57) */
 static int row_kind(int i, int *idx)
 {
     int e = emu_rows();
@@ -443,14 +445,14 @@ static int row_kind(int i, int *idx)
     if (i <= e) { *idx = i - 1; return S.emsg ? R_MSG : R_ROM; }
     if (i == e + 1) return R_HEAD_BUILTIN;
     *idx = i - e - 2;
-    return R_STOCK;
+    return *idx < NSTOCK ? R_STOCK : R_TIMING;
 }
 static int selectable(int i)
 {
     int k, n = row_count();
     if (i < 0 || i >= n) return 0;
     k = row_kind(i, &n);
-    return k == R_ROM || k == R_STOCK;
+    return k == R_ROM || k == R_STOCK || k == R_TIMING;
 }
 static void show_sel(void)                                /* scroll so the selection (and its heading) shows */
 {
@@ -674,6 +676,12 @@ static int32_t service(void)
         if (!ev) break;
         uint32_t type = ev >> 24, k = ev & 0x1FF;
         if (type != EV_PRESS && type != 0x30) continue;
+        if (S.state == ST_TIMING) {                               /* build 57: Up / Down scroll, anything else back */
+            if (k == K_UP || k == K_DOWN) { S.ttop += k == K_DOWN ? 1 : -1; if (S.ttop < 0) S.ttop = 0; }
+            else if (type == EV_PRESS) S.state = ST_LIST;
+            redraw();
+            continue;
+        }
         if (k == K_B || (k == K_LEFT && type == EV_PRESS)) { quit(); return -1; }
         if (S.state == ST_ERR) { if (type == EV_PRESS) { S.state = ST_LIST; redraw(); } continue; }
         if (S.state != ST_LIST) continue;
@@ -683,12 +691,51 @@ static int32_t service(void)
         } else if (k == K_A && type == EV_PRESS && selectable(S.sel)) {
             int idx = 0, kind = row_kind(S.sel, &idx);
             if (kind == R_STOCK) { launch(STOCK[idx].task); return -1; }
+            if (kind == R_TIMING) { S.state = ST_TIMING; S.ttop = 0; redraw(); continue; }
             B->keep = KEEP_TAG | (uint32_t)S.top << 8 | (uint32_t)S.sel;
             start(&B->list[idx]);
             if (S.state == ST_RUN) return 0;
         }
     }
     return 0;
+}
+
+/* ---- Timing screen (build 57): the latest start in the timing log (timing.c), times from that start ---- */
+#define TL       ((volatile uint32_t *)0x0309F700u)
+#define TL_MAGIC 0x544C4F47u
+#define TL_N     22u
+static void timing_paint(void)
+{
+    volatile uint32_t *t = TL;
+    if (t[0] != TL_MAGIC || !t[1]) { say(12, 64, C_INK, "No log yet", 0, 0, 0, 0, 0); return; }
+    uint32_t n = t[1] < TL_N ? t[1] : TL_N, first = t[1] - n;  /* events first .. t[1] - 1 are in the ring */
+    #define EV_T(k)   (t[4 + 2 * ((k) % TL_N)])
+    #define EV_TAG(k) (t[5 + 2 * ((k) % TL_N)] & 0xFF)
+    #define EV_ARG(k) (t[5 + 2 * ((k) % TL_N)] >> 8)
+    uint32_t s = first, k;                    /* latest start: a track step or the Now Playing screen (module 27) */
+    for (k = t[1]; k-- > first; ) if (EV_TAG(k) == 7 || (EV_TAG(k) == 2 && (EV_ARG(k) & 0xFF) == 27)) { s = k; break; }
+    uint32_t t0 = EV_T(s), snd = 0;                           /* times: stock's 10 ms tick */
+    for (k = s; k < t[1]; k++) if (EV_TAG(k) == 6) { snd = (EV_T(k) - t0) * 10u + 1; break; }
+    int y = 64;
+    if (t[2]) say(12, y, C_INK, "Boot to menu %1 s", t[2] / 10u, 0, 0, 0, 0);
+    y += 22;
+    if (snd) say(12, y, C_INK, "Start to sound %d ms", snd - 1, 0, 0, 0, 0);
+    else say(12, y, C_DIM, "No sound after the last start", 0, 0, 0, 0, 0);
+    y += 22;
+    if (S.ttop > (int)(t[1] - s) - 1) S.ttop = (int)(t[1] - s) - 1;
+    for (k = s + (uint32_t)S.ttop; k < t[1] && y < 200; k++, y += 22) {
+        uint32_t ms = (EV_T(k) - t0) * 10u, a = EV_ARG(k);
+        switch (EV_TAG(k)) {
+        case 2: say(12, y, C_INK, "%d  Load %d", ms, a & 0xFF, 0, 0, 0); break;
+        case 3: say(12, y, C_INK, "%d  Music init", ms, 0, 0, 0, 0); break;
+        case 4: say(12, y, C_INK, "%d  Audio start", ms, 0, 0, 0, 0); break;
+        case 6: say(12, y, C_INK, "%d  First sound", ms, 0, 0, 0, 0); break;
+        case 7: say(12, y, C_INK, "%d  Track step", ms, 0, 0, 0, 0); break;
+        case 8: say(12, y, C_INK, "%d  Menu", ms, 0, 0, 0, 0); break;
+        default: say(12, y, C_DIM, "%d  ?", ms, 0, 0, 0, 0); break;
+        }
+    }
+    say(12, 200, C_DIM, "ms from the start, 10 ms steps", 0, 0, 0, 0, 0);
 }
 
 static void paint(void)
@@ -703,8 +750,9 @@ static void paint(void)
     fill(0, 59, 295, 60, C_INK);
     fill(0, 221, 295, 222, C_INK);
     fill(0, 223, 295, 239, C_SCREEN);
-    say(12, 39, C_INK, "Games", 0, 0, 0, 0, 0);
+    say(12, 39, C_INK, S.state == ST_TIMING ? "Timing" : "Games", 0, 0, 0, 0, 0);
     for (int r = 0; r < ROWS; r++) fill(0, 61 + r * 23, 295, 61 + r * 23 + 22, C_WHITE);
+    if (S.state == ST_TIMING) { timing_paint(); COLOR = old; return; }
     if (S.state == ST_ERR) {
         if (S.err == 100) say(12, 64, C_INK, "Game Boy Color only", 0, 0, 0, 0, 0);
         else if (S.err == 101) say(12, 64, C_INK, "Over 2 MB", 0, 0, 0, 0, 0);
@@ -722,6 +770,7 @@ static void paint(void)
         else if (kind == R_HEAD_BUILTIN) say(12, y + 3, C_DIM, "Built-in", 0, 0, 0, 0, 0);
         else if (kind == R_MSG) say(12, y + 3, C_DIM, S.emsg, 0, 0, 0, 0, 0);
         else if (kind == R_STOCK) say(12, y + 3, C_INK, STOCK[idx].name, 0, 0, 0, 0, 0);
+        else if (kind == R_TIMING) say(12, y + 3, C_INK, "Timing", 0, 0, 0, 0, 0);
         else if (kind == R_ROM) {
             const rom_t *rm = &B->list[idx];
             uint16_t t[EX_NAME + 1];
