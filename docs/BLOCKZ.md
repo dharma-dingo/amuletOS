@@ -5,7 +5,7 @@ Apotris, look inspired by Game Boy Color era menus (Tetris DX), in the amuletOS 
 Original name, code and art; no third-party code (Apotris source is not public, so we design
 from its published mechanics and the public SRS guideline). First release: **Sprint 40 lines only.**
 
-Values marked **(owner?)** are proposals waiting for Brett's pick.
+Values marked **(owner?)** are proposals waiting for the owner's pick.
 
 ## Sprint mode
 

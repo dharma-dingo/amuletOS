@@ -11,7 +11,7 @@ checklist, release plan, decisions), `docs/HARDWARE.md` (every technical finding
 **amuletOS** is custom firmware for the **Hidizs AP30 Music Boy**: Rockchip RKNano (two
 Cortex-M3 cores), CS43198 DAC, 296×240 RGB565 screen with rounded bezel corners, Game Boy-style
 controls (d-pad, A, B, Start, Select, a volume wheel, power). Theme: the Kingdom of Zeal colours
-(sky blue, cloud white, lavender, gold) in a Game Boy Color era style. Owner: Brett.
+(sky blue, cloud white, lavender, gold) in a Game Boy Color era style. 
 
 | Thing | Where |
 |---|---|
@@ -28,6 +28,12 @@ controls (d-pad, A, B, Start, Select, a volume wheel, power). Theme: the Kingdom
 ---
 
 ## 2. How to build, flash and recover
+
+**Release (v0.3+):** `bash build/b60.sh` (the release build), then
+`python tools/make_patch.py firmware/HIFIYF18.IMG build/v060/HIFIYF18.IMG build/release_v0.3` writes
+`amuletos_patch.py` and `amuletOS-0.3-patcher.html` (the GitHub release assets). Never publish an IMG: it contains
+Hidizs firmware. A new release needs a newer stamp than the last "back to stock" stamp (2620071161).
+
 
 **Normal install (no special mode):** copy `HIFIYF18.IMG` to the top level of the AP30's
 internal drive (the ~216 MB one, usually D:), eject, unplug, restart. The device installs it on
@@ -216,6 +222,7 @@ been on an August build).
 | 57 | …57 | **v0.4 timing log** (owner: start v0.4; plan: measure before fixing, no phone video). Slot 2 `timing.c` `tlog_hook` + `timing.S` stubs log events with stock's 10 ms tick (0x0302288C) into a 22-entry ring at 0x0309F700..0x0309F7C0 (top of the library builder region; gbprobe U_END lowered to 0x0309F700): tag 2 ModuleOverlay (module, type), 3 player thread init m33 0x0308DDD0, 4 Audio Start m33 0x0308C8EE (both patched in the image, `patch_code.py timing`), 6 first audio refill (0x030661A4) after 3/4 = first sound, 7 track step (np_stub.S pl_step_hook), 8 main menu opened (first = boot time; m21_ext.c). Module 0 sites (ModuleOverlay 0x030683DE, refill 0x030661A4) run before slot 2 loads at boot, so m22_ext.c patches them in RAM when the Music menu draws (only if they still hold stock bytes; interrupts off; away from the boot path in case a module 0 write ever faults). `extend_module.py` passes slot-2 symbols as `H_<name>`. Readout: Games list last row "Timing" (boot to menu, start to sound, each event in ms from the latest start = Now Playing load (module 27) or a track step). Slot 2: 1720 B (56 B free); TaskSwitch hook and microsecond times dropped to fit. No image changes | built; copied to device (hash verified)  owner: opening the Music menu started a library update with the hooks live; the log at 0x0309F700 is inside the library builder's code (module 39 code runs 0x03081924..0x0309F7CC), so log writes hit code being run: unsafe, replaced by 58 |
 | 58 | …58 | **Timing log moved out of the library builder.** Log now in the 52 B between module 39's code end (0x0309F7CC) and slot 2 (0x0309F800): no module uses it and no literal in code.bin points there. Packed: [0] 0x544C << 16 | count, [1] boot tick | armed << 31, 11 entries tick (20 bits) | tag << 20 | module << 24. gbprobe U_END back to 0x0309F7C0. Same hooks and readout as 57 | built; tested (owner): play from a list: Load 27 and Load 33 at 0, Music init 30, Audio start 550, Load 34 550, first sound 660 ms after the Now Playing load; Next: track step, Audio start, Load 34 at 0, Load 41 and Load 71 at 10, first sound 100 ms. So stock's path from Now Playing to the first refill is fast; the slow part is before Now Playing loads or after the first refill. Boot 250.1 s is wrong (log survived a restart) |
 | 59 | …59 | **Timing: key press marker, freeze, boot fix.** TaskSwitch hook back (`t_task`, installed with the others from the Music menu; slot 2 1772 B, 4 B free): a start = TaskSwitch to Now Playing (screen 3) or a track step; the first sound freezes the log until the next start (moving to the Timing screen no longer pushes the start out of the 11-entry ring); main menu only sets the boot time, the first after power-on (tick went backwards = new power-up). Readout start = screen 3 or a track step | built; copied to device (hash verified) |
+| 60 | …60 | **amuletOS v0.3 release** (owner: "get this ready for release", call it v0.3, experimental Game Boy OK, hidden test shortcuts OK). No test items in views: the Timing row, timing hooks and the slot-2 logger are dev-only (`-DAMU_TIMING=1` for build_helpers / extend_module / build_module, plus timing.c timing.S and the `timing` patch); slot 2 back to 1448 B. Blockz's info page stays (hidden: Left while paused). Boot screen and USB name already say 0.3. Patchers (`tools/make_patch.py`, `patcher/`): browser page + Python script, input must be official V1.7.8 (SHA-256 c7601873...), output must be this build (3cfeeac7...); patch = our code / art / font as data, 231 recoloured images as one 65536-entry table, 76 lightened list icons as ops, 6 KB of moved stock code as copies from the user's file (48 B of instruction-sized fragments left as data); 511 KB compressed. "Back to stock" = the official file re-stamped 2620071161 with its CRC (ap30fw verify passes). Both tested in the browser and in Python | built; copied to device (hash verified = the patcher output) |
 
 ### v0.2 planning (Blockz)
 - Owner wants stock's block game **replaced** by our own: Apotris-inspired feel, Tetris DX
@@ -267,8 +274,8 @@ been on an August build).
   users, GitHub Actions builds both, "back to stock" option. Before public: rename away from
   Chrono Trigger names, strip diagnostic hooks, licence + disclaimer, scan git history for
   firmware, testers on other units.
-- Working style with Brett: **lead every reply with his next physical action** when there is one;
-  ask before flashing and before each push; he has no smartphone; wants design input early, with
+- Working style with the owner: **lead every reply with their next physical action** when there is one;
+  ask before flashing and before each push; no smartphone (no video); wants design input early, with
   choices as buttons; terse is fine.
 
 ---

@@ -20,6 +20,7 @@ extern const uint16_t music_menu[];                       /* m22_ext.S: {icon, t
  * RAM until power-off; a site is only patched while it still holds stock's bytes). Here rather than in the main
  * menu: if writing module 0 ever faulted, only this menu would break, and a normal update would still work.
  * H_ names are slot-2 addresses (tools/extend_module.py, from helpers.json). */
+#if AMU_TIMING                          /* dev builds only (-DAMU_TIMING=1) */
 extern const char H_t_task[], H_t_ovl[], H_t_irq[];
 
 static void hook_bw(uint32_t at, uint32_t to, uint32_t stock)
@@ -43,11 +44,14 @@ static void tlog_install(void)
     hook_bw(0x030683DEu, (uint32_t)H_t_ovl, 0x4FF0E92Du);      /* ModuleOverlay: push.w {r4-r11, lr} */
     hook_bw(0x030661A4u, (uint32_t)H_t_irq, 0x43F0E92Du);      /* audio refill: push.w {r4-r9, lr} */
 }
+#endif
 
 void m22_row_text(int x, int y, int w, int h, int z, int id)
 {
     uint32_t icon = 0;
+#if AMU_TIMING
     tlog_install();
+#endif
     for (int i = 0; i < 8; i++)
         if (music_menu[3 * i + 1] == (uint16_t)id) { icon = music_menu[3 * i]; break; }
     int row = (y - TEXT_DY) / 23;

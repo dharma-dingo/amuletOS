@@ -37,6 +37,7 @@ def main():
     p.add_argument("--at", type=lambda s: int(s, 0), default=None)
     p.add_argument("--donor", type=int, default=100)
     p.add_argument("--json", default=None)
+    p.add_argument("-D", dest="defines", action="append", default=[], help="preprocessor define (e.g. AMU_TIMING=1)")
     a = p.parse_args()
 
     if os.path.abspath(a.src) != os.path.abspath(a.out):
@@ -71,7 +72,7 @@ def main():
     hj = os.path.join(a.src, "helpers.json")
     defsyms = [f"-Wl,--defsym=H_{k}={v:#x}" for k, v in (json.load(open(hj)).items() if os.path.exists(hj) else ())
                if k[:1].isalpha() and k.replace("_", "").isalnum()]
-    run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
+    run(tool("gcc"), *["-D" + d for d in a.defines], "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
         "-fno-tree-loop-distribute-patterns", "-ffunction-sections", "-Wall", "-Wextra", "-Wno-unused-parameter",
         "-I", os.path.join(ROOT, "game"), f"-Wl,-Ttext={ext_run:#x}", "-Wl,--no-warn-rwx-segments", "-Wl,-e,0",
         "-Wl,-Map=" + os.path.join(work, "ext.map"), *defsyms, "-o", elf, *a.sources)

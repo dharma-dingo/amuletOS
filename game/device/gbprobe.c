@@ -11,7 +11,8 @@
  * Build 55 (owner): the Games screen is one list with two headed sections, "Emu" (the ROMs in /_gb) and
  * "Built-in" (the stock games whose modules are untouched; their exits come back here, patch_code.py games_back).
  * The test rows (Sound test, core B memory, Benchmark; builds 43..54) are gone (owner).
- * Build 57 (v0.4 speed work): a last row "Timing" shows the play-start log (timing.c); it goes once v0.4 is done.
+ * Build 57 (v0.4 speed work): a last row "Timing" shows the play-start log (timing.c). Dev builds only
+ * (-DAMU_TIMING=1); release builds leave it out (v0.3 release, owner: no test items in views).
  * Build 50: game sound (minigb_apu), paced by the sound output. Hold Select for 1.5 s to quit. No saves.
  * Build 53 (owner): no stats; the picture fills the screen height (266 x 240) in a DMG look (gb_scale.h).
  *
@@ -437,7 +438,10 @@ static const struct { uint8_t task; char name[19]; } STOCK[] = {
 enum { R_HEAD_EMU, R_ROM, R_MSG, R_HEAD_BUILTIN, R_STOCK, R_TIMING };
 
 static int emu_rows(void) { return S.emsg ? 1 : S.nlist; }
-static int row_count(void) { return emu_rows() + 2 + NSTOCK + 1; }   /* + "Timing" (build 57) */
+#ifndef AMU_TIMING
+#define AMU_TIMING 0
+#endif
+static int row_count(void) { return emu_rows() + 2 + NSTOCK + (AMU_TIMING ? 1 : 0); }   /* + "Timing" (dev) */
 static int row_kind(int i, int *idx)
 {
     int e = emu_rows();

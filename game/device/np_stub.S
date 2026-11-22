@@ -11,9 +11,11 @@
     .thumb_func
 pl_step_hook:
     push    {r0-r3, r12, lr}
-    movs    r2, #7                  @ timing log (build 57, timing.c): track step
+#if AMU_TIMING                      /* dev builds only (-DAMU_TIMING=1): timing log, track step (timing.c) */
+    movs    r2, #7
     bl      tlog_hook
     ldmia   sp, {r0, r1}
+#endif
     bl      pl_step
     cmp     r0, #0
     pop     {r0-r3, r12, lr}

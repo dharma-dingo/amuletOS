@@ -27,9 +27,11 @@ void menu_art(void)
  * slot-2 addresses (tools/extend_module.py, from helpers.json). */
 extern const char H_tlog_hook[];
 
-void tlog_install(void)
+void tlog_install(void)                 /* dev builds only (-DAMU_TIMING=1); empty in a release */
 {
+#if AMU_TIMING
     ((void (*)(uint32_t, uint32_t, uint32_t))((uint32_t)H_tlog_hook | 1))(0, 0, 8);
+#endif
 }
 
 /* Games tile action (build 54, patch_code.py menu_carousel): the Game Boy list, task 20 (game/device/gbprobe.c) */

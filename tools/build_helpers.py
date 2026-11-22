@@ -25,6 +25,8 @@ def run(*a):
 
 def main():
     src, out, sources = sys.argv[1], sys.argv[2], sys.argv[3:]
+    defines = [x for x in sources if x.startswith("-D")]    # e.g. -DAMU_TIMING=1 (dev builds: timing log)
+    sources = [x for x in sources if not x.startswith("-D")]
     os.makedirs(out, exist_ok=True)
     for f in os.listdir(src):
         if os.path.isfile(os.path.join(src, f)) and f != "HIFIYF18.IMG":
@@ -38,7 +40,7 @@ def main():
 
     work = os.path.join(out, "helpers_build"); os.makedirs(work, exist_ok=True)
     elf, bin_ = os.path.join(work, "helpers.elf"), os.path.join(work, "helpers.bin")
-    run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
+    run(tool("gcc"), *defines, "-mcpu=cortex-m3", "-mthumb", "-Os", "-ffreestanding", "-nostdlib", "-nostartfiles",
         "-fno-tree-loop-distribute-patterns", "-ffunction-sections", "-Wall", "-Wextra", "-Wno-unused-parameter",
         f"-Wl,-Ttext={at_run:#x}", "-Wl,-e,np_load", "-Wl,--no-warn-rwx-segments",
         "-Wl,-Map=" + os.path.join(work, "helpers.map"), "-o", elf, *sources)

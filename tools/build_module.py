@@ -45,11 +45,12 @@ def main():
     p.add_argument("--data-max", type=lambda s: int(s, 0), default=DATA_MAX)
     p.add_argument("--span", default=None, help="START:END code.bin span of unreachable stock modules to use")
     p.add_argument("--opt", default="Os", help="gcc optimisation level (Os, O2)")
+    p.add_argument("-D", dest="defines", action="append", default=[], help="preprocessor define (e.g. AMU_TIMING=1)")
     a = p.parse_args()
 
     work = os.path.join(a.out, "module_build"); os.makedirs(work, exist_ok=True)
     elf = os.path.join(work, "module.elf")
-    run(tool("gcc"), "-mcpu=cortex-m3", "-mthumb", "-" + a.opt, "-ffreestanding", "-nostdlib", "-nostartfiles",
+    run(tool("gcc"), *["-D" + d for d in a.defines], "-mcpu=cortex-m3", "-mthumb", "-" + a.opt, "-ffreestanding", "-nostdlib", "-nostartfiles",
         "-fno-tree-loop-distribute-patterns", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra",
         "-Wno-unused-parameter", "-Wl,--gc-sections", "-T", os.path.join(ROOT, "game", "device", "module.ld"),
         "-Wl,-Map=" + os.path.join(work, "module.map"), "-Wl,--no-warn-rwx-segments", "-o", elf, *a.sources)
