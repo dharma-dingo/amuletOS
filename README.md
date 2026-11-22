@@ -6,6 +6,16 @@ menu, a new Now Playing screen, playlists, a block game and an experimental Game
 
 **Current release: v0.3** (see [CHANGELOG.md](CHANGELOG.md)).
 
+| | |
+|---|---|
+| ![Main menu](docs/screenshots/menu.png) | ![Now Playing](docs/screenshots/now_playing.png) |
+| Main menu | Now Playing |
+| ![Playlists](docs/screenshots/playlists.png) | ![Blockz](docs/screenshots/blockz.png) |
+| Playlists | Blockz |
+
+<sub>Rendered on a PC from the firmware's own art, fonts and drawing code, with sample content
+(`art/readme_shots.py`).</sub>
+
 ## What you get in v0.3
 
 - **New look:** a light Pocket-style interface with a new font, applied to every screen.
