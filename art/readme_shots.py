@@ -5,8 +5,8 @@
 
 Writes docs/screenshots/{menu,now_playing,playlists,blockz}.png at 2x with the screen's rounded corners.
   menu         the Music card exactly as packed in the firmware (art/pocket.py; stock adds its status icons)
-  now_playing  game/device/npui.c run on the PC (art/np_preview.py) with a public-domain sample and an original
-               placeholder cover
+  now_playing  game/device/npui.c run on the PC (art/np_preview.py) with sample tags (owner's pick) and the
+               firmware's default cover (no real cover art)
   playlists    the Playlists screen laid out as game/device/playlists.c paint() draws it, sample playlist names
   blockz       the Blockz renderer (game/render.c) from the bot replay (python game/build.py preview)
 Sample content only: no real cover art or game footage.
@@ -32,31 +32,15 @@ def finish(im296):
     return NP.to_image(v.tobytes()).resize((592, 480), Image.NEAREST)
 
 
-def cover():
-    """original placeholder cover: night sky, moon (116 x 116, the stock cover size)"""
-    im = Image.new("RGB", (116, 116))
-    d = ImageDraw.Draw(im)
-    for y in range(116):
-        t = y / 115
-        d.line([(0, y), (115, y)], fill=(int(36 + 70 * t), int(40 + 30 * t), int(92 + 60 * t)))
-    d.ellipse((60, 18, 96, 54), fill=(250, 246, 226))
-    d.ellipse((70, 14, 104, 48), fill=(56, 52, 112))
-    for x, y in ((18, 22), (34, 48), (22, 70), (48, 30), (100, 72), (84, 92), (12, 96)):
-        d.rectangle((x, y, x + 1, y + 1), fill=(240, 236, 250))
-    d.rectangle((0, 98, 115, 115), fill=(30, 34, 70))
-    return im
-
-
 def now_playing(fdir):
     def background():
         im = pocket.now_playing().image(1).convert("RGB")
-        for n, xy in ((34, (105, 10)), (31, (143, 6)), (45, (183, 7)), (287, (209, 11))):
-            im.paste(Image.open(NP.ART / f"{n:03d}.png").convert("RGB"), xy)
-        im.paste(cover(), (17, 46))
+        for n, xy in ((34, (105, 10)), (31, (143, 6)), (45, (183, 7)), (287, (209, 11)), (277, (17, 46))):
+            im.paste(Image.open(NP.ART / f"{n:03d}.png").convert("RGB"), xy)   # 277: the default cover
         a = np.array(im).astype(np.uint16)
         return ((a[..., 0] >> 3) << 11 | (a[..., 1] >> 2) << 5 | (a[..., 2] >> 3)).astype("<u2")
     NP.background = background
-    NP.SAMPLES = [("Clair de Lune", "Claude Debussy", "Suite bergamasque", 102, 301, 3, 4)]
+    NP.SAMPLES = [("Scars of Time", "Yasunori Mitsuda", "Chrono Cross Original Soundtrack", 102, 245, 3, 22)]
     tmp = ROOT / "build/readme_np"
     sys.argv = ["np_preview.py", str(fdir), str(tmp)]
     NP.main()

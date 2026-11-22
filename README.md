@@ -34,6 +34,10 @@ menu, a new Now Playing screen, playlists, a block game and an experimental Game
 
 ## Install
 
+**Full walkthrough, including where to put playlists, Blockz music and games on the SD card:
+[docs/SETUP.md](docs/SETUP.md).** No special button combination is needed: the AP30 updates from a file copied
+over USB.
+
 You need the official AP30 firmware **V1.7.8** (`HIFIYF18.IMG`) from the
 [Hidizs download center](https://hidizs.net/pages/download-center). amuletOS is applied to your own copy of it,
 so no Hidizs firmware is shared here.
@@ -44,6 +48,17 @@ so no Hidizs firmware is shared here.
    **Python:** `python amuletos_patch.py HIFIYF18.IMG` writes `amuletOS-0.3/HIFIYF18.IMG`.
 3. Connect the AP30 by USB, copy the new `HIFIYF18.IMG` to its **internal storage** (not the SD card), eject it
    and unplug. The player installs the update and restarts. Charge the battery first: low battery stops updates.
+
+### SD card at a glance
+
+The card must be **exFAT** for Playlists and Games (cards of 64 GB and up usually are). Folder names ignore case.
+
+| Folder | What goes in it |
+|---|---|
+| anywhere | your music (Artist / Album folders with tags work best) |
+| `/_Playlists/` | `.m3u` / `.m3u8` playlists (up to 24, first 24 tracks of each) |
+| `/_blockgame/` | audio files Blockz shuffles when nothing else is playing |
+| `/_gb/` | original Game Boy `.gb` games (up to 24, 2 MB each) |
 
 The patcher refuses any file except the official V1.7.8, and only saves a result whose SHA-256 matches the
 amuletOS release:
